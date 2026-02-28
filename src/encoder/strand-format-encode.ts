@@ -147,9 +147,7 @@ function renderApiRoutes(graph: StrandGraph): string {
 
   let out = `─── API ROUTES (${apiRoutes.length}) ─────────────────────────────────\n`;
 
-  const showCount = Math.min(apiRoutes.length, 12);
-  for (let i = 0; i < showCount; i++) {
-    const route = apiRoutes[i]!;
+  for (const route of apiRoutes) {
     const methods =
       (route.framework?.metadata as { methods?: string[] })?.methods?.join(
         ",",
@@ -160,18 +158,7 @@ function renderApiRoutes(graph: StrandGraph): string {
     const lines = `${route.lines}L`.padStart(5);
     const complexity = route.complexity.toFixed(2);
 
-    // Annotation for key routes
-    let annotation = "";
-    if (route.complexity > 0.8) annotation = " ← payment+POS hub";
-    else if (routePath.includes("cancel")) annotation = " ← void flow";
-    else if (routePath.includes("register")) annotation = "";
-    else if (routePath.includes("magic-link")) annotation = "";
-
-    out += `${methods.padEnd(18)} ${routePath.padEnd(44)} ${lines}  ${complexity}${annotation}\n`;
-  }
-
-  if (apiRoutes.length > showCount) {
-    out += `  ... +${apiRoutes.length - showCount} more routes\n`;
+    out += `${methods.padEnd(7)}${routePath.padEnd(50)} ${lines} ${complexity}\n`;
   }
 
   out += `\n`;
@@ -187,9 +174,7 @@ function renderPages(graph: StrandGraph): string {
 
   let out = `─── PAGES (${pages.length}) ──────────────────────────────────────────\n`;
 
-  const showCount = Math.min(pages.length, 10);
-  for (let i = 0; i < showCount; i++) {
-    const page = pages[i]!;
+  for (const page of pages) {
     const routePath =
       (page.framework?.metadata as { routePath?: string })?.routePath ||
       page.path;
@@ -200,15 +185,7 @@ function renderPages(graph: StrandGraph): string {
     const lines = `${page.lines}L`.padStart(5);
     const complexity = page.complexity.toFixed(2);
 
-    let annotation = "";
-    if (routePath === "/") annotation = "  homepage";
-    else if (routePath.includes("order/review")) annotation = "  ← payment UI";
-
-    out += `${(routePath + client).padEnd(40)} ${lines}  ${complexity}${annotation}\n`;
-  }
-
-  if (pages.length > showCount) {
-    out += `  ... +${pages.length - showCount} more pages\n`;
+    out += `${(routePath + client).padEnd(44)} ${lines} ${complexity}\n`;
   }
 
   out += `\n`;
