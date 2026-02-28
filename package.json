@@ -1,0 +1,38 @@
+{
+  "name": "strand",
+  "version": "0.1.0",
+  "description": "Cartography for codebases — a visual encoding format that lets AI see your project",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "strand": "dist/cli/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx",
+    "scan": "tsx src/cli/scan.ts",
+    "encode": "tsx src/encoder/encode.ts",
+    "experiment": "tsx experiments/visual-vs-text.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "ai",
+    "codebase",
+    "visual-encoding",
+    "llm",
+    "developer-tools"
+  ],
+  "author": "Joel Lopez Berrum",
+  "license": "MIT",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.78.0",
+    "sharp": "^0.34.5",
+    "tree-sitter": "^0.21.1",
+    "tree-sitter-typescript": "^0.23.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.2"
+  }
+}

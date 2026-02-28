@@ -1,0 +1,6 @@
+node_modules/
+dist/
+experiments/output/
+.env
+.env.local
+*.log
