@@ -18,13 +18,16 @@ export function encodeToStrandFormat(graph: StrandGraph): string {
   let out = "";
 
   // Header
-  out += `STRAND v1 | ${graph.projectName} | ${capitalize(graph.framework)} | ${graph.totalFiles} files | ${graph.totalLines.toLocaleString()} lines\n\n`;
+  out += `STRAND v2 | ${graph.projectName} | ${capitalize(graph.framework)} | ${graph.totalFiles} files | ${graph.totalLines.toLocaleString()} lines\n\n`;
 
   // TERRAIN section — complexity heatmap
   out += renderTerrain(graph);
 
   // INFRASTRUCTURE section — inter-module dependency roads
   out += renderInfrastructure(graph);
+
+  // FLOWS section — entry point dependency maps
+  out += renderFlows(graph);
 
   // API ROUTES section
   out += renderApiRoutes(graph);
@@ -263,6 +266,183 @@ function renderTestCoverage(graph: StrandGraph): string {
   let out = `─── TEST COVERAGE ───────────────────────────────────────\n`;
   out += `${testNodes.length} test files | ${testedFiles.size}/${testableFiles.length} testable files with direct test edges (${coveragePercent}%)\n`;
 
+  return out;
+}
+
+// ─── FLOWS ──────────────────────────────────────────────
+
+/**
+ * Finer-grained module ID for FLOWS.
+ * Uses 3 path segments for src/lib and src/app to distinguish sub-modules.
+ * e.g., "src/lib/teacher-club" vs "src/lib/cluster-pos"
+ */
+function getFlowModuleId(nodePath: string): string {
+  const parts = nodePath.split("/");
+  if (
+    parts.length > 3 &&
+    parts[0] === "src" &&
+    (parts[1] === "lib" || parts[1] === "app" || parts[1] === "components")
+  ) {
+    return parts.slice(0, 3).join("/");
+  }
+  return parts.length > 2
+    ? parts.slice(0, 2).join("/")
+    : (parts[0] ?? nodePath);
+}
+
+/**
+ * Classify a single file path into a domain.
+ * Uses word boundaries on "test" to avoid matching "contest", "latest", etc.
+ */
+function classifyNodeDomain(nodePath: string): string {
+  if (/auth|session|login|magic-link|trusted-device|verify/.test(nodePath))
+    return "auth";
+  if (/payment|authorize-net|order|cart|price|tip/.test(nodePath))
+    return "payment";
+  if (/\btest\b|\.spec\.|__tests__/.test(nodePath)) return "test";
+  return "other";
+}
+
+/**
+ * Classify an entire flow (entry point + dependencies) by domain.
+ * Entry point path takes priority; falls back to majority-vote on deps.
+ */
+function classifyFlow(entryPath: string, depPaths: string[]): string {
+  // Primary: classify by entry point
+  const entryDomain = classifyNodeDomain(entryPath);
+  if (entryDomain !== "other" && entryDomain !== "test") return entryDomain;
+
+  // Fallback: majority vote on dependency paths
+  const votes = new Map<string, number>();
+  for (const p of depPaths) {
+    const d = classifyNodeDomain(p);
+    if (d !== "other" && d !== "test") {
+      votes.set(d, (votes.get(d) || 0) + 1);
+    }
+  }
+
+  let best = "data";
+  let bestCount = 0;
+  for (const [domain, count] of votes) {
+    if (count > bestCount) {
+      best = domain;
+      bestCount = count;
+    }
+  }
+  return best;
+}
+
+/**
+ * Shorten a file path for display in FLOWS.
+ * Strips src/, file extensions, and /route /page suffixes.
+ */
+function shortenPath(fullPath: string): string {
+  return fullPath
+    .replace(/^src\//, "")
+    .replace(/\.(ts|tsx|js|jsx)$/, "")
+    .replace(/\/route$/, "")
+    .replace(/\/page$/, "");
+}
+
+/**
+ * Auto-detect business flows by finding API route entry points and their
+ * cross-sub-module dependencies. Renders as hub-and-spoke: each entry point
+ * lists its direct dependencies, classified by domain.
+ *
+ * This design handles star patterns (one hub importing many leaves) correctly,
+ * which is the actual topology of business logic in Next.js API routes.
+ */
+function renderFlows(graph: StrandGraph): string {
+  // 1. Build adjacency from ALL non-test import edges across sub-modules
+  const adj = new Map<string, Set<string>>();
+
+  for (const edge of graph.edges) {
+    if (edge.type === "tests") continue;
+
+    const fromMod = getFlowModuleId(edge.from);
+    const toMod = getFlowModuleId(edge.to);
+    if (fromMod === toMod) continue;
+
+    if (!adj.has(edge.from)) adj.set(edge.from, new Set());
+    adj.get(edge.from)!.add(edge.to);
+  }
+
+  // 2. Find entry points: API routes with outgoing cross-sub-module edges
+  const entryPoints = graph.nodes
+    .filter((n) => n.type === "api-route" && adj.has(n.id))
+    .sort((a, b) => b.complexity - a.complexity);
+
+  if (entryPoints.length === 0) return "";
+
+  // 3. Build flow entries: each entry point + its cross-sub-module deps
+  interface FlowEntry {
+    entry: string;
+    deps: string[];
+    domain: string;
+  }
+
+  const flows: FlowEntry[] = [];
+
+  for (const ep of entryPoints) {
+    const deps = [...(adj.get(ep.id) || [])];
+    if (deps.length === 0) continue;
+
+    // Sort deps by complexity (most significant first)
+    const nodeMap = new Map(graph.nodes.map((n) => [n.id, n]));
+    deps.sort((a, b) => {
+      const ca = nodeMap.get(a)?.complexity ?? 0;
+      const cb = nodeMap.get(b)?.complexity ?? 0;
+      return cb - ca;
+    });
+
+    const domain = classifyFlow(ep.id, deps);
+    if (domain === "test") continue;
+
+    flows.push({ entry: ep.id, deps, domain });
+  }
+
+  if (flows.length === 0) return "";
+
+  // 4. Group by domain, limit to top 3 flows per domain (by entry complexity)
+  const grouped = new Map<string, FlowEntry[]>();
+  for (const flow of flows) {
+    if (!grouped.has(flow.domain)) grouped.set(flow.domain, []);
+    const domainFlows = grouped.get(flow.domain)!;
+    if (domainFlows.length < 3) {
+      domainFlows.push(flow);
+    }
+  }
+
+  // 5. Render
+  let out = `─── FLOWS ──────────────────────────────────────────────\n`;
+  out += `Entry points and their cross-module dependencies\n\n`;
+
+  // Sort domains: payment first, then auth, then rest alphabetically
+  const domainOrder = ["payment", "auth", "data"];
+  const sortedDomains = [...grouped.keys()].sort((a, b) => {
+    const ai = domainOrder.indexOf(a);
+    const bi = domainOrder.indexOf(b);
+    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+  });
+
+  for (const domain of sortedDomains) {
+    const domainFlows = grouped.get(domain)!;
+    const label = `${domain}:`.padEnd(12);
+
+    for (let i = 0; i < domainFlows.length; i++) {
+      const flow = domainFlows[i]!;
+      const entryStr = shortenPath(flow.entry);
+      const depStr = flow.deps.map((p) => shortenPath(p)).join(", ");
+
+      if (i === 0) {
+        out += `${label}${entryStr} -> ${depStr}\n`;
+      } else {
+        out += `${"".padEnd(12)}${entryStr} -> ${depStr}\n`;
+      }
+    }
+  }
+
+  out += `\n`;
   return out;
 }
 

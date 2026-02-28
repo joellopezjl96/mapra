@@ -246,7 +246,7 @@ function classifyFile(
 function extractImports(content: string): string[] {
   const imports: string[] = [];
   const importRegex =
-    /(?:import\s+.*?from\s+['"]([^'"]+)['"]|require\s*\(\s*['"]([^'"]+)['"]\s*\))/g;
+    /(?:import\s+[\s\S]*?from\s+['"]([^'"]+)['"]|require\s*\(\s*['"]([^'"]+)['"]\s*\))/g;
   let match;
 
   while ((match = importRegex.exec(content)) !== null) {
@@ -393,17 +393,20 @@ function detectPathAliases(rootDir: string): Map<string, string> {
 
   if (fs.existsSync(tsconfigPath)) {
     try {
-      // Simple JSON parse — doesn't handle comments, but works for most cases
+      // Strip single-line comments only — block comment stripping is unsafe
+      // because it matches /* inside glob patterns like "**/*.ts"
       const content = fs
         .readFileSync(tsconfigPath, "utf-8")
-        .replace(/\/\/.*$/gm, "")
-        .replace(/\/\*[\s\S]*?\*\//g, "");
+        .replace(/^\s*\/\/.*$/gm, "");
       const tsconfig = JSON.parse(content);
       const paths = tsconfig.compilerOptions?.paths || {};
 
       for (const [alias, targets] of Object.entries(paths)) {
         const cleanAlias = alias.replace("/*", "");
-        const target = (targets as string[])[0]?.replace("/*", "") || "";
+        const target =
+          (targets as string[])[0]
+            ?.replace("/*", "")
+            .replace(/^\.\//, "") || "";
         aliases.set(cleanAlias, target);
       }
     } catch {
