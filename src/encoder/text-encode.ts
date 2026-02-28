@@ -5,8 +5,9 @@
  */
 
 import type { StrandGraph } from "../scanner/index.js";
+import type { GraphAnalysis } from "../analyzer/index.js";
 
-export function encodeToText(graph: StrandGraph): string {
+export function encodeToText(graph: StrandGraph, analysis?: GraphAnalysis): string {
   let text = "";
 
   // Layer 0: Identity
@@ -22,6 +23,19 @@ export function encodeToText(graph: StrandGraph): string {
     text += `- ${mod.name} (${mod.path}): ${mod.nodeCount} files, ${mod.totalLines} lines`;
     if (entryCount > 0) text += ` [${entryCount} entry points]`;
     text += `\n`;
+  }
+
+  // Risk analysis
+  if (analysis && analysis.risk.length > 0) {
+    text += `\n## Risk (Change With Care)\n`;
+    const top = analysis.risk.slice(0, 8);
+    for (const r of top) {
+      text += `- ${r.nodeId}: ${r.affectedCount} affected, depth ${r.maxDepth}, ${r.modulesAffected} modules, amp ${r.amplificationRatio.toFixed(1)}\n`;
+    }
+    const remaining = analysis.risk.length - top.length;
+    if (remaining > 0) {
+      text += `  ... and ${remaining} more with blast radius > 1\n`;
+    }
   }
 
   // Layer 2: Routes and API

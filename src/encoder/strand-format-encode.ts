@@ -9,12 +9,14 @@
  */
 
 import type { StrandGraph, StrandEdge } from "../scanner/index.js";
+import type { GraphAnalysis } from "../analyzer/index.js";
+import { getModuleId } from "../analyzer/graph-utils.js";
 
 /**
  * Generate a .strand format encoding of the codebase.
  * Does NOT use the layout engine — no coordinates needed.
  */
-export function encodeToStrandFormat(graph: StrandGraph): string {
+export function encodeToStrandFormat(graph: StrandGraph, analysis?: GraphAnalysis): string {
   let out = "";
 
   // Header
@@ -25,6 +27,11 @@ export function encodeToStrandFormat(graph: StrandGraph): string {
 
   // INFRASTRUCTURE section — inter-module dependency roads
   out += renderInfrastructure(graph);
+
+  // RISK section — blast radius analysis
+  if (analysis) {
+    out += renderRisk(analysis);
+  }
 
   // FLOWS section — entry point dependency maps
   out += renderFlows(graph);
@@ -135,6 +142,32 @@ function renderInfrastructure(graph: StrandGraph): string {
       .join(" ");
 
     out += `${fromName.padEnd(12)} ${line}${connector} ${toName.padEnd(14)} ×${data.count.toString().padStart(2)}  ${categories}\n`;
+  }
+
+  out += `\n`;
+  return out;
+}
+
+function renderRisk(analysis: GraphAnalysis): string {
+  const top = analysis.risk.slice(0, 8);
+  if (top.length === 0) return "";
+
+  let out = `─── RISK (change with care) ─────────────────────────────\n`;
+
+  for (const r of top) {
+    const name = r.nodeId.padEnd(40);
+    const affected = `${r.affectedCount} affected`.padStart(12);
+    const depth = `depth ${r.maxDepth}`;
+    const inbound = `×${r.directImporters} in`.padStart(6);
+    const mods = `${r.modulesAffected} mod`;
+    const amp = `amp ${r.amplificationRatio.toFixed(1)}`;
+
+    out += `${name} ${affected}  ${depth}  ${inbound}  ${mods}  ${amp}\n`;
+  }
+
+  const remaining = analysis.risk.length - top.length;
+  if (remaining > 0) {
+    out += `  +${remaining} more with blast radius > 1\n`;
   }
 
   out += `\n`;
@@ -474,13 +507,6 @@ function complexityBar(complexity: number, width: number): string {
   }
 
   return bar;
-}
-
-function getModuleId(nodePath: string): string {
-  const parts = nodePath.split("/");
-  return parts.length > 2
-    ? parts.slice(0, 2).join("/")
-    : (parts[0] ?? nodePath);
 }
 
 function classifyEdge(fromPath: string, toPath: string): string {
