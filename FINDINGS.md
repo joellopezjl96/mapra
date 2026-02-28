@@ -3,7 +3,7 @@
 Research log tracking what we've learned about encoding codebases for LLM consumption.
 
 **Project:** Strand — codebase cartography for AI
-**Target codebase:** SenorBurritoCompany (Next.js 14, 284 files, 49,834 lines, 25 modules)
+**Target codebase:** SenorBurritoCompany (Next.js 14, 289 files, 49,966 lines, 27 modules)
 **Model:** claude-sonnet-4-20250514 (1024 max tokens)
 **5 standard questions:** inventory (Q1), analysis (Q2), navigation (Q3), architecture (Q4), dependency (Q5)
 
@@ -181,11 +181,118 @@ This question revealed a consistent divergence across all experiments:
 
 ---
 
+## Experiment 4: .strand v2 Validation
+
+**Date:** 2026-02-28
+**File:** `experiments/experiment-4-strand-v2.ts`
+**Results:** `experiments/output/experiment-4-results.json`
+
+### Hypothesis
+
+.strand v1 had two known weaknesses: Q1 (route truncation — only 12 of 36 routes enumerable) and Q3 (payment flow misidentification — catering/spirit-night listed as payment entry points, cluster-pos/client missing). Can v2 fix these without regressing Q2/Q4/Q5?
+
+### Design Improvements Over Previous Experiments
+
+1. **Same scan for all conditions** — v1 and v2 encodings generated from one `scanCodebase()` call (no codebase-drift confound)
+2. **Frozen v1 encoder** — imported from `strand-format-encode-v1.ts`, not loaded from a saved file
+3. **Uniform prompts** — identical template for all conditions, no domain priming
+4. **3 trials per condition-question** — surfaces non-determinism (45 API calls total)
+5. **Automated scoring rubrics** — ground-truth checks for Q1 (route count) and Q3 (correct files, false positives)
+
+### Conditions
+
+| # | Condition | Description | Encoding Size |
+|---|-----------|-------------|---------------|
+| 1 | Text Only | Baseline structured text | 6.7 KB (~1,726 tokens) |
+| 2 | .strand v1 | Frozen v1 encoder (same graph) | 5.4 KB (~1,381 tokens) |
+| 3 | .strand v2 | Uncapped routes/pages + FLOWS section | 10.0 KB (~2,566 tokens) |
+
+v2 is +85.8% larger than v1 due to uncapped routes/pages and the new FLOWS section.
+
+### Token Costs (averaged per 5-question run)
+
+| Condition | Input | Output | Total | vs Text |
+|-----------|-------|--------|-------|---------|
+| Text Only | 13,874 | 2,965 | **16,839** | baseline |
+| .strand v1 | 9,794 | 2,428 | **12,222** | -27.4% |
+| .strand v2 | 16,839 | 2,813 | **19,652** | +16.7% |
+
+### Q1 Scoring: Route Inventory
+
+Ground truth: 36 API routes.
+
+| Condition | Stated Count | Routes Enumerated | Agreement (3 trials) |
+|-----------|-------------|-------------------|---------------------|
+| Text Only | 36 | **36/36** | 3/3 |
+| .strand v1 | 36 | **12/36** | 3/3 |
+| .strand v2 | 36 | **36/36** | 3/3 |
+
+**v1 problem:** Correctly stated "36 routes" (from section header) but could only enumerate the 12 shown, acknowledging "+24 more routes" were truncated. All 3 trials produced identical responses.
+
+**v2 fix:** All 36 routes enumerated with correct HTTP methods across all 3 trials. Matches Text Only performance.
+
+### Q3 Scoring: Payment Flow Navigation
+
+Ground truth files: `orders/route`, `ordering`, `cluster-pos/client`
+Known false positives: `catering/page`, `spirit-night/page`
+
+| Condition | Correct Files | Missing | False Positives | Guessed Paths | Agreement |
+|-----------|--------------|---------|-----------------|--------------|-----------|
+| Text Only | 2-3/3 | cluster-pos (1 trial) | None | 3/3 trials | Moderate |
+| .strand v1 | 2/3 | cluster-pos/client (all) | **catering, spirit-night** | 3/3 trials | High (same error) |
+| .strand v2 | **3/3** | None | **None** | 1/3 trials | High |
+
+**v1 problem:** Never found `cluster-pos/client`. Listed `catering/page` and `spirit-night/page` as payment entry points in all 3 trials — these are event pages, not payment processors. The v1 encoding had no way to show which files the orders route actually depends on, so the model guessed from file names containing payment-adjacent keywords.
+
+**v2 fix:** FLOWS section explicitly maps `orders/route -> ordering, cluster-pos/client, authorize-net, price-validation, payment-emails`. All 3 trials named the correct files. None listed catering or spirit-night as payment entry points. The model also surfaced `authorize-net.ts`, `price-validation.ts`, and `payment-emails.ts` — real files that v1 never mentioned.
+
+### Q2/Q4/Q5 Regression Check
+
+| Question | Text Only | .strand v1 | .strand v2 | Regression? |
+|----------|-----------|------------|------------|-------------|
+| Q2 (analysis) | 2/3 "app", 1/3 "__tests__" | 3/3 "__tests__" | 3/3 "__tests__" | No |
+| Q4 (architecture) | Comparable | Comparable | Comparable | No |
+| Q5 (dependency) | Correct top deps | Correct top deps | Correct top deps | No |
+
+No regressions detected. Q2 shows v1 and v2 are more consistent (always `__tests__`) than Text Only, which is non-deterministic on this question.
+
+### Key Findings
+
+1. **FLOWS fixes Q3 decisively.** v1 scored 2/3 correct files with false positives in every trial. v2 scored 3/3 with zero false positives. The FLOWS section gives the model explicit dependency data instead of forcing it to guess from file names.
+
+2. **Uncapping fixes Q1 completely.** v1 could state the count but not enumerate. v2 enumerates all 36, matching Text Only. Trivial fix, large impact.
+
+3. **v2 surfaces files invisible to v1.** `authorize-net.ts`, `price-validation.ts`, `payment-emails.ts` appeared in every v2 Q3 response. These are real, important payment files that v1 (and even Text Only) never mentioned because they're not in the HOTSPOTS or MOST IMPORTED sections — they only appear as dependencies in FLOWS.
+
+4. **Cost trade-off is moderate.** v2 costs +16.7% vs Text Only and +61% vs v1. The encoding grew from 5.4 KB to 10.0 KB. For system prompt injection (~2.6K tokens), this is still viable but approaching the upper bound.
+
+5. **No regressions on Q2/Q4/Q5.** v2 answers are comparable or more consistent than v1.
+
+6. **Trial consistency is high.** Most condition-question pairs gave identical answers across all 3 trials. The main source of non-determinism is Text Only on Q2 (2/3 "app" vs 1/3 "__tests__").
+
+### Verdict
+
+**v2 achieves its goals.** Both target weaknesses (Q1 truncation, Q3 misidentification) are fixed without regressions. The cost increase is acceptable for the accuracy gains. The FLOWS section is the most impactful change — it provides relational context that no other section captures.
+
+### The .strand v2 Trade-off (updated from Exp 3)
+
+| Metric | .strand v1 | .strand v2 | Text Only |
+|--------|-----------|-----------|-----------|
+| Token cost | **Best** (12.2K) | Mid (19.7K) | Mid (16.8K) |
+| Q1 route enumeration | Partial (12/36) | **Full (36/36)** | **Full (36/36)** |
+| Q3 payment navigation | 2/3, false positives | **3/3, no FPs** | 2-3/3, guessed |
+| Q3 file discovery | 2 files | **6 files** | 3 files |
+| System prompt viable | **Yes** (~1.4K tokens) | Yes (~2.6K tokens) | Borderline (~1.7K) |
+
+---
+
 ## Recommended Encodings
 
 ### For system prompts (context-constrained)
 
-**.strand format** — 1.2K tokens, 32% cheaper than text, good accuracy on most questions. The ASCII heatmap gives complexity intuition without an image. Best for: always-on context injection, large codebases where token budget matters.
+**.strand v2** — 2.6K tokens, fixes both known v1 weaknesses (route truncation, payment flow misidentification) while remaining viable for system prompt injection. The FLOWS section provides relational context no other encoding captures. Best for: always-on context injection where navigational accuracy matters.
+
+**.strand v1** — 1.4K tokens, if budget is extremely tight. Accepts Q1/Q3 limitations for 46% fewer tokens than v2.
 
 ### For one-shot analysis
 
@@ -199,11 +306,13 @@ This question revealed a consistent divergence across all experiments:
 
 ## Open Questions
 
-1. **Does .strand scale?** Tested on a 284-file project. Would the compact format still be useful at 2,000 files? 10,000?
-2. **Can we improve .strand's relational context?** Q3 weakness (wrong payment entry points) suggests the compact format loses inter-file relationships. Could a "flows" section fix this?
+1. **Does .strand scale?** Tested on a 289-file project. Would the compact format still be useful at 2,000 files? 10,000? v2 is already 10 KB at 289 files.
+2. ~~**Can we improve .strand's relational context?**~~ **ANSWERED (Exp 4):** Yes. FLOWS section fixes Q3 completely — 3/3 correct files, zero false positives, and surfaces 3 additional payment files invisible to v1.
 3. **Would a smarter terrain PNG help?** Current terrain uses SVG→PNG which loses fidelity. Would a purpose-built low-res heatmap (e.g., 400×300 pixels, large text labels) avoid the hallucination problem?
 4. **Is the cross-modal insight from Terrain+Text reliable?** The "low-complexity files are most depended-on" observation was novel and correct, but n=1. Does it replicate across different codebases and questions?
-5. **Non-determinism in Text Only.** Q2 answer changed between experiments with identical encoding. How much variance exists in the factual answers? Should we run multiple trials?
+5. ~~**Non-determinism in Text Only.**~~ **PARTIALLY ANSWERED (Exp 4):** 3-trial design confirms Q2 non-determinism in Text Only (2/3 "app", 1/3 "__tests__"). v1 and v2 are deterministic on Q2 (always "__tests__"). All other questions show high trial consistency across all conditions.
+6. **Is v2's size growth sustainable?** v2 is +85.8% larger than v1 (5.4 KB → 10.0 KB). FLOWS contributes most of the growth. Could FLOWS be compressed (e.g., top-3 flows only) without losing accuracy?
+7. **Does v2 generalize to other codebases?** Tested only on SenorBurritoCompany. Do the FLOWS heuristics (3-segment module IDs, keyword-based domain classification) work on projects with different structures?
 
 ---
 
@@ -218,9 +327,13 @@ This question revealed a consistent divergence across all experiments:
 | `src/encoder/layer-infrastructure.ts` | Layer 2: data flow & dependencies |
 | `src/encoder/layer-labels.ts` | Layer 3: precise details |
 | `src/encoder/spatial-text-encode.ts` | Spatial text with @(x,y) coordinates |
-| `src/encoder/strand-format-encode.ts` | .strand ASCII art format |
+| `src/encoder/strand-format-encode.ts` | .strand v2 ASCII art format (FLOWS + uncapped) |
+| `src/encoder/strand-format-encode-v1.ts` | .strand v1 frozen encoder (experiment control) |
 | `experiments/visual-vs-text.ts` | Experiment 1 & 2 runner |
 | `experiments/experiment-3-formats.ts` | Experiment 3 runner |
+| `experiments/experiment-4-strand-v2.ts` | Experiment 4 runner (v1 vs v2 validation) |
 | `experiments/output/experiment-results.json` | Exp 1 raw results |
 | `experiments/output/experiment-2-results.json` | Exp 2 raw results |
 | `experiments/output/experiment-3-results.json` | Exp 3 raw results |
+| `experiments/output/experiment-4-results.json` | Exp 4 raw results |
+| `experiments/output/exp4-strand-v2.strand` | Exp 4 v2 encoding snapshot |
