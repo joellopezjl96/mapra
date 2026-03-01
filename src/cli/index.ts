@@ -55,7 +55,7 @@ function printHelp() {
 strand — codebase cartography for AI
 
 Quick start:
-  strand setup                  Generate .strand and wire CLAUDE.md in one step
+  strand                        Run setup in current directory (first-time setup)
   strand update                 Regenerate .strand after codebase changes
 
 Commands:
