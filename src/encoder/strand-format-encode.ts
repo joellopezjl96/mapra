@@ -22,33 +22,29 @@ export function encodeToStrandFormat(graph: StrandGraph, analysis?: GraphAnalysi
   // Header
   out += `STRAND v2 | ${graph.projectName} | ${capitalize(graph.framework)} | ${graph.totalFiles} files | ${graph.totalLines.toLocaleString()} lines\n\n`;
 
-  // TERRAIN section — complexity heatmap
-  out += renderTerrain(graph);
-
-  // INFRASTRUCTURE section — inter-module dependency roads
-  out += renderInfrastructure(graph);
-
-  // RISK section — blast radius analysis
+  // RISK first — highest signal for change-impact questions
   if (analysis) {
     out += renderRisk(analysis);
   }
 
-  // FLOWS section — entry point dependency maps
-  out += renderFlows(graph);
+  // FLOWS second — relational context for navigation questions
+  out += renderFlows(graph, analysis);
 
-  // API ROUTES section
-  out += renderApiRoutes(graph);
-
-  // PAGES section
-  out += renderPages(graph);
-
-  // HOTSPOTS section
+  // HOTSPOTS + MOST IMPORTED — file-level signals
   out += renderHotspots(graph);
-
-  // MOST IMPORTED section
   out += renderMostImported(graph);
 
-  // TEST COVERAGE section
+  // TERRAIN — orientation heatmap
+  out += renderTerrain(graph);
+
+  // INFRASTRUCTURE — inter-module topology
+  out += renderInfrastructure(graph);
+
+  // API ROUTES + PAGES — enumeration sections
+  out += renderApiRoutes(graph);
+  out += renderPages(graph);
+
+  // TEST COVERAGE — lowest signal, fine at end
   out += renderTestCoverage(graph);
 
   return out;
@@ -152,17 +148,17 @@ function renderRisk(analysis: GraphAnalysis): string {
   const top = analysis.risk.slice(0, 8);
   if (top.length === 0) return "";
 
-  let out = `─── RISK (change with care) ─────────────────────────────\n`;
+  let out = `─── RISK (blast radius — modifying these cascades broadly) ─\n`;
 
   for (const r of top) {
-    const name = r.nodeId.padEnd(40);
-    const affected = `${r.affectedCount} affected`.padStart(12);
-    const depth = `depth ${r.maxDepth}`;
-    const inbound = `×${r.directImporters} in`.padStart(6);
-    const mods = `${r.modulesAffected} mod`;
-    const amp = `amp ${r.amplificationRatio.toFixed(1)}`;
+    const isAmplified = r.amplificationRatio >= 2.0;
+    const marker = isAmplified ? "[AMP]" : "     ";
+    const amp = `amp${r.amplificationRatio.toFixed(1)}`.padEnd(7);
+    const flow = `×${r.directImporters}→${r.affectedCount}`.padEnd(9);
+    const depth = `d${r.maxDepth}`.padEnd(4);
+    const mods = `${r.modulesAffected}mod`.padEnd(5);
 
-    out += `${name} ${affected}  ${depth}  ${inbound}  ${mods}  ${amp}\n`;
+    out += `${marker} ${amp} ${flow} ${depth} ${mods} ${r.nodeId}\n`;
   }
 
   const remaining = analysis.risk.length - top.length;
