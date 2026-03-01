@@ -566,16 +566,29 @@ function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+/**
+ * Compute a module description from the 3 most-imported file names within it.
+ * Always correct because it derives from the actual graph, not from path guessing.
+ */
 function moduleDescription(modPath: string, graph: StrandGraph): string {
-  const lower = modPath.toLowerCase();
-  if (lower.includes("app")) return "routes, pages, admin, TLC";
-  if (lower.includes("test")) return "unit, api, integration";
-  if (lower.includes("lib")) return "auth, payment, POS, email";
-  if (lower.includes("component")) return "TLC, admin, kitchen, shared";
-  if (lower.includes("script")) return "deploy, sync, broadcast";
-  if (lower.includes("cluster")) return "POS API client";
-  if (lower.includes("prisma")) return "schema, migrations";
-  if (lower.includes("data")) return "menu-pricing";
-  if (lower.includes("e2e")) return "end-to-end tests";
-  return "";
+  // Count inbound edges for files within this module
+  const inboundCounts = new Map<string, number>();
+  for (const edge of graph.edges) {
+    if (edge.to.startsWith(modPath + "/") || edge.to === modPath) {
+      inboundCounts.set(edge.to, (inboundCounts.get(edge.to) || 0) + 1);
+    }
+  }
+
+  if (inboundCounts.size === 0) return "";
+
+  // Take top 3 by inbound count, use basename without extension
+  const top3 = [...inboundCounts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([filePath]) => {
+      const base = filePath.split("/").pop() ?? filePath;
+      return base.replace(/\.(ts|tsx|js|jsx)$/, "");
+    });
+
+  return top3.join(", ");
 }
