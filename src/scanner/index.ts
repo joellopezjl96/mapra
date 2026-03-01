@@ -98,7 +98,7 @@ export function scanCodebase(rootDir: string): StrandGraph {
   resolveEdges(nodes, edges, rootDir);
 
   // Detect module boundaries
-  const modules = detectModules(nodes, rootDir);
+  const modules = detectModules(nodes, rootDir, edges);
 
   // Calculate complexity
   calculateComplexity(nodes);
@@ -533,7 +533,11 @@ function findNodeByImport(
   return null;
 }
 
-function detectModules(nodes: StrandNode[], rootDir: string): ModuleBoundary[] {
+function detectModules(
+  nodes: StrandNode[],
+  rootDir: string,
+  edges: StrandEdge[],
+): ModuleBoundary[] {
   const modules: ModuleBoundary[] = [];
 
   // Group files by top-level directories
@@ -549,15 +553,13 @@ function detectModules(nodes: StrandNode[], rootDir: string): ModuleBoundary[] {
   }
 
   for (const [dirPath, groupNodes] of dirGroups) {
-    // Find entry points — nodes imported by files outside this module
+    // Entry points: nodes in this module that are imported by files OUTSIDE this module
+    const groupNodeIds = new Set(groupNodes.map((n) => n.id));
     const entryPoints = groupNodes
       .filter((n) =>
-        nodes.some(
-          (other) =>
-            !other.path.startsWith(dirPath) &&
-            other.imports.some((imp) =>
-              imp.includes(n.path.replace(/\.(ts|tsx|js|jsx)$/, "")),
-            ),
+        edges.some(
+          (e) =>
+            e.to === n.id && !groupNodeIds.has(e.from),
         ),
       )
       .map((n) => n.id);
