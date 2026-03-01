@@ -434,11 +434,22 @@ function resolveEdges(
             from: node.id,
             to: target.id,
             type: edgeType,
-            weight: 1,
+            weight: 1, // normalized below
           });
         }
       }
     }
+  }
+
+  // Normalize weights: files imported by many callers have lower coupling per edge.
+  // weight = 1 / log(1 + importerCount) so a file with 100 importers has weight ~0.22.
+  const importerCounts = new Map<string, number>();
+  for (const e of edges) {
+    importerCounts.set(e.to, (importerCounts.get(e.to) || 0) + 1);
+  }
+  for (const e of edges) {
+    const count = importerCounts.get(e.to) || 1;
+    e.weight = Math.round((1 / Math.log(1 + count)) * 100) / 100;
   }
 }
 
@@ -580,8 +591,11 @@ function detectModules(
 function calculateComplexity(nodes: StrandNode[]): void {
   if (nodes.length === 0) return;
 
-  const maxLines = Math.max(...nodes.map((n) => n.lines));
-  const maxImports = Math.max(...nodes.map((n) => n.imports.length));
+  const maxLines = nodes.reduce((max, n) => (n.lines > max ? n.lines : max), 0);
+  const maxImports = nodes.reduce(
+    (max, n) => (n.imports.length > max ? n.imports.length : max),
+    0,
+  );
 
   for (const node of nodes) {
     // Simple complexity: weighted combination of lines and import count
