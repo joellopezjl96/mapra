@@ -33,7 +33,7 @@ const MODEL = "claude-sonnet-4-20250514";
 const LEGEND_LINE =
   "LEGEND: ×N=imported by N files | █▓░·=complexity high→low | ═/·=coupling strong/weak | ×A→B=A direct, B total affected | dN=cascade depth | [AMP]=amplification≥2x | NL=lines of code";
 
-type ConditionId = "strand-bare" | "strand-legend";
+type ConditionId = "current";
 type Tier = "A" | "B";
 type Classification = "COMPREHENDS" | "PARTIAL" | "PATTERN_MATCH";
 
@@ -43,8 +43,7 @@ interface Condition {
 }
 
 const CONDITIONS: Condition[] = [
-  { id: "strand-bare", name: "strand-bare" },
-  { id: "strand-legend", name: "strand-legend" },
+  { id: "current", name: "v2+legend (baked-in)" },
 ];
 
 // ─── Encoding helpers ─────────────────────────────────────
@@ -161,28 +160,19 @@ async function runExperiment() {
   );
 
   const analysis = analyzeGraph(graph);
-  const bareEncoding = encodeToStrandFormat(graph, analysis);
-  const legendEncoding = addLegend(bareEncoding);
+  const encoding = encodeToStrandFormat(graph, analysis);
 
   const outputDir = path.join(__dirname, "output");
   fs.mkdirSync(outputDir, { recursive: true });
-  fs.writeFileSync(path.join(outputDir, "exp8-strand-bare.strand"), bareEncoding);
-  fs.writeFileSync(path.join(outputDir, "exp8-strand-legend.strand"), legendEncoding);
+  fs.writeFileSync(path.join(outputDir, "exp8b-current.strand"), encoding);
 
-  const legendOverhead = legendEncoding.length - bareEncoding.length;
-  const overheadPct = ((legendOverhead / bareEncoding.length) * 100).toFixed(2);
-  console.log(`Encodings generated:`);
-  console.log(
-    `  strand-bare:   ${bareEncoding.length} chars (~${Math.round(bareEncoding.length / 4)} tokens)`,
-  );
-  console.log(
-    `  strand-legend: ${legendEncoding.length} chars (+${legendOverhead} chars, ${overheadPct}% overhead)`,
-  );
+  console.log(`Encoding: ${encoding.length} chars (~${Math.round(encoding.length / 4)} tokens)`);
+  console.log(`LEGEND baked in: ${encoding.includes("LEGEND:") ? "yes" : "NO — check encoder"}`);
   console.log();
 
   // Build questions with runtime-extracted examples
-  const { dense, sparse } = extractTerrainBars(bareEncoding);
-  const riskEntry = extractRiskEntry(bareEncoding);
+  const { dense, sparse } = extractTerrainBars(encoding);
+  const riskEntry = extractRiskEntry(encoding);
 
   const QUESTIONS: ScoredQuestion[] = [
     {
@@ -298,8 +288,7 @@ async function runExperiment() {
   const client = new Anthropic({ apiKey });
 
   const conditionContent: Record<ConditionId, string> = {
-    "strand-bare": bareEncoding,
-    "strand-legend": legendEncoding,
+    "current": encoding,
   };
 
   const results: QuestionResult[] = [];
@@ -375,40 +364,44 @@ Be specific. Reference the notation and values from the encoding directly.`;
     });
   }
 
-  const resultsPath = path.join(outputDir, "experiment-8-results.json");
+  const resultsPath = path.join(outputDir, "experiment-8b-results.json");
   fs.writeFileSync(resultsPath, JSON.stringify(results, null, 2));
   console.log(`\nResults saved to ${resultsPath}`);
 
   printMatrix(results);
-  printHypothesisChecks(results, bareEncoding, legendEncoding);
+  printHypothesisChecks(results, encoding, encoding);
 }
 
 // ─── Output ───────────────────────────────────────────────
 
+// Exp 8 strand-legend baseline scores for comparison (avg/max)
+const EXP8_LEGEND_BASELINE: Record<string, number> = {
+  q1: 3.0, q2: 4.0, q3: 5.3, q4: 3.0, q5: 3.0, q6: 5.0, q7: 4.0, q8: 3.0,
+};
+
 function printMatrix(results: QuestionResult[]): void {
   console.log("\n\n========================================");
-  console.log("COMPREHENSION MATRIX");
+  console.log("COMPREHENSION MATRIX — Exp 8b (legend baked in)");
   console.log("========================================\n");
 
-  const header = `${"Question".padEnd(14)} ${"strand-bare".padEnd(22)} ${"strand-legend".padEnd(22)} ${"delta".padStart(6)}`;
+  const header = `${"Question".padEnd(14)} ${"current (baked-in)".padEnd(24)} ${"exp8 legend baseline".padEnd(22)} ${"delta".padStart(6)}`;
   console.log(header);
   console.log("-".repeat(header.length));
 
   for (const r of results) {
-    const bare = r.conditions.find((c) => c.conditionId === "strand-bare")!;
-    const legend = r.conditions.find((c) => c.conditionId === "strand-legend")!;
-    const delta = legend.avgScore - bare.avgScore;
+    const current = r.conditions.find((c) => c.conditionId === "current")!;
+    const baseline = EXP8_LEGEND_BASELINE[r.questionId] ?? 0;
+    const delta = current.avgScore - baseline;
     const deltaStr = (delta >= 0 ? "+" : "") + delta.toFixed(1);
 
-    const classCount = (cond: ConditionResult) => {
-      const C = cond.trials.filter((t) => t.classification === "COMPREHENDS").length;
-      const P = cond.trials.filter((t) => t.classification === "PARTIAL").length;
-      const PM = cond.trials.filter((t) => t.classification === "PATTERN_MATCH").length;
-      return `${cond.avgScore.toFixed(1)}/${r.maxScore}  C${C}/P${P}/PM${PM}`;
-    };
+    const C = current.trials.filter((t) => t.classification === "COMPREHENDS").length;
+    const P = current.trials.filter((t) => t.classification === "PARTIAL").length;
+    const PM = current.trials.filter((t) => t.classification === "PATTERN_MATCH").length;
+    const currentStr = `${current.avgScore.toFixed(1)}/${r.maxScore}  C${C}/P${P}/PM${PM}`;
+    const baselineStr = `${baseline.toFixed(1)}/${r.maxScore}`;
 
     console.log(
-      `${(r.questionId + " [T" + r.tier + "]").padEnd(14)} ${classCount(bare).padEnd(22)} ${classCount(legend).padEnd(22)} ${deltaStr.padStart(6)}`,
+      `${(r.questionId + " [T" + r.tier + "]").padEnd(14)} ${currentStr.padEnd(24)} ${baselineStr.padEnd(22)} ${deltaStr.padStart(6)}`,
     );
   }
 }
@@ -422,79 +415,50 @@ function printHypothesisChecks(
   console.log("HYPOTHESIS CHECKS");
   console.log("========================================\n");
 
-  // H1: Without legend, Tier A comprehension ≥75%
-  const tierABareTrials = results
+  // H1: Tier A comprehension ≥75% (with baked-in legend)
+  const tierATrials = results
     .filter((r) => r.tier === "A")
-    .flatMap(
-      (r) => r.conditions.find((c) => c.conditionId === "strand-bare")!.trials,
-    );
-  const tierABareScore = tierABareTrials.reduce((s, t) => s + t.score, 0);
-  const tierABareMax = tierABareTrials.reduce((s, t) => s + t.max, 0);
-  const h1ratio = tierABareScore / tierABareMax;
+    .flatMap((r) => r.conditions.find((c) => c.conditionId === "current")!.trials);
+  const tierAScore = tierATrials.reduce((s, t) => s + t.score, 0);
+  const tierAMax = tierATrials.reduce((s, t) => s + t.max, 0);
+  const h1ratio = tierAScore / tierAMax;
   console.log(
-    `H1 (bare Tier A ≥75%): ${(h1ratio * 100).toFixed(1)}%  ${h1ratio >= 0.75 ? "✓ CONFIRMED" : "✗ REJECTED"}`,
+    `H1 (Tier A ≥75%): ${(h1ratio * 100).toFixed(1)}%  ${h1ratio >= 0.75 ? "✓ CONFIRMED" : "✗ REJECTED"}`,
   );
 
-  // H2: LEGEND boosts Tier B more than Tier A
-  const avgBoost = (tier: Tier) => {
-    const qs = results.filter((r) => r.tier === tier);
-    const bareRatio =
-      qs.reduce(
-        (s, r) =>
-          s +
-          r.conditions.find((c) => c.conditionId === "strand-bare")!.avgScore /
-            r.maxScore,
-        0,
-      ) / qs.length;
-    const legendRatio =
-      qs.reduce(
-        (s, r) =>
-          s +
-          r.conditions.find((c) => c.conditionId === "strand-legend")!.avgScore /
-            r.maxScore,
-        0,
-      ) / qs.length;
-    return legendRatio - bareRatio;
-  };
-  const boostA = avgBoost("A");
-  const boostB = avgBoost("B");
+  // H2: Tier B comprehension ≥75% (with baked-in legend)
+  const tierBTrials = results
+    .filter((r) => r.tier === "B")
+    .flatMap((r) => r.conditions.find((c) => c.conditionId === "current")!.trials);
+  const tierBScore = tierBTrials.reduce((s, t) => s + t.score, 0);
+  const tierBMax = tierBTrials.reduce((s, t) => s + t.max, 0);
+  const h2ratio = tierBScore / tierBMax;
   console.log(
-    `H2 (Tier B boost > Tier A): Tier A boost=${(boostA * 100).toFixed(1)}%  Tier B boost=${(boostB * 100).toFixed(1)}%  ${boostB > boostA ? "✓ CONFIRMED" : "✗ REJECTED"}`,
+    `H2 (Tier B ≥75%): ${(h2ratio * 100).toFixed(1)}%  ${h2ratio >= 0.75 ? "✓ CONFIRMED" : "✗ REJECTED"}`,
   );
 
-  // H3: Q8 has lowest comprehension
-  const q8Bare = results
-    .find((r) => r.questionId === "q8")!
-    .conditions.find((c) => c.conditionId === "strand-bare")!;
-  const q8Ratio = q8Bare.avgScore / results.find((r) => r.questionId === "q8")!.maxScore;
-  const allBareRatios = results.map(
-    (r) =>
-      r.conditions.find((c) => c.conditionId === "strand-bare")!.avgScore /
-      r.maxScore,
+  // H3: Q8 still the hardest question
+  const q8cond = results.find((r) => r.questionId === "q8")!
+    .conditions.find((c) => c.conditionId === "current")!;
+  const q8Ratio = q8cond.avgScore / results.find((r) => r.questionId === "q8")!.maxScore;
+  const allRatios = results.map(
+    (r) => r.conditions.find((c) => c.conditionId === "current")!.avgScore / r.maxScore,
   );
-  const minRatio = Math.min(...allBareRatios);
+  const minRatio = Math.min(...allRatios);
   console.log(
     `H3 (Q8 lowest comprehension): Q8=${(q8Ratio * 100).toFixed(1)}%  min overall=${(minRatio * 100).toFixed(1)}%  ${q8Ratio <= minRatio + 0.01 ? "✓ CONFIRMED" : "✗ REJECTED"}`,
   );
 
-  // H4: LEGEND overhead <5%
-  const overhead = legend.length - bare.length;
-  const overheadPct = overhead / bare.length;
-  console.log(
-    `H4 (LEGEND <5% overhead): +${overhead} chars  ${(overheadPct * 100).toFixed(2)}%  ${overheadPct < 0.05 ? "✓ CONFIRMED" : "✗ REJECTED"}`,
+  // vs Exp 8 legend baseline
+  const exp8Total = Object.values(EXP8_LEGEND_BASELINE).reduce((s, v) => s + v, 0);
+  const currentTotal = results.reduce(
+    (s, r) => s + r.conditions.find((c) => c.conditionId === "current")!.avgScore,
+    0,
   );
-
-  console.log("\n--- DESIGN DECISION ---");
-  const legendMeaningfullyHelps = boostB > 0.05 || boostA > 0.05;
-  if (legendMeaningfullyHelps) {
-    console.log(
-      "→ LEGEND improves comprehension. Recommend adding to .strand format.",
-    );
-  } else {
-    console.log(
-      "→ Format is self-documenting without LEGEND. No legend needed.",
-    );
-  }
+  const delta = currentTotal - exp8Total;
+  console.log(
+    `\nVs Exp8 strand-legend baseline: total score ${currentTotal.toFixed(1)} vs ${exp8Total.toFixed(1)} (${delta >= 0 ? "+" : ""}${delta.toFixed(1)})  ${delta >= 0 ? "✓ matches or exceeds" : "✗ regression"}`,
+  );
 }
 
 runExperiment().catch(console.error);

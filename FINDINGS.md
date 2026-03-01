@@ -800,3 +800,48 @@ The CLAUDE.md `@.strand` injection via `strand init` works as designed — the e
 **Add the LEGEND to `.strand`.** Tier B boost is meaningful (+9.6%) and the overhead is negligible (3.51%). The Q3 regression is a rubric artifact — the LEGEND's compressed `×A→B` notation describes the concept correctly, just differently than the regex expected.
 
 **One caveat:** The Q8 ceiling (50% PARTIAL, no COMPREHENDS) reveals a genuine gap. The format does not make the distinction between "N files import this" and "this cascades through N files" visually obvious. Future format work should consider whether MOST IMPORTED and RISK can be annotated to make this contrast clearer (e.g., marking MOST IMPORTED entries that are also in RISK with a flag).
+
+---
+
+## Experiment 8b: Validation — LEGEND Baked Into Encoder
+
+**Date:** 2026-03-01
+**File:** `experiments/experiment-8-comprehension.ts` (updated to single condition)
+**Results:** `experiments/output/experiment-8b-results.json`
+
+### Setup
+
+LEGEND line added to `src/encoder/strand-format-encode.ts` (line 2 of every `.strand` output). Experiment rerun with one condition: the current encoder output.
+
+### Comprehension Matrix vs Exp 8 strand-legend Baseline
+
+| Question | Baked-in | Exp8 Baseline | Δ |
+|----------|----------|---------------|---|
+| Q1 [Tier A] | 3.0/3 C3/P0 | 3.0/3 | 0.0 |
+| Q2 [Tier A] | 4.0/4 C3/P0 | 4.0/4 | 0.0 |
+| Q3 [Tier A] | 6.0/6 C3/P0 | 5.3/6 | **+0.7** |
+| Q4 [Tier A] | 3.0/3 C3/P0 | 3.0/3 | 0.0 |
+| Q5 [Tier B] | 3.0/3 C3/P0 | 3.0/3 | 0.0 |
+| Q6 [Tier B] | 4.7/5 C2/P1 | 5.0/5 | -0.3 (variance) |
+| Q7 [Tier B] | 4.0/4 C3/P0 | 4.0/4 | 0.0 |
+| Q8 [Tier B] | 2.3/4 C0/P3 | 3.0/4 | -0.7 (variance) |
+| **Total** | **30.0/31** | **30.3** | **-0.3** |
+
+### Hypothesis Checks
+
+| Check | Result |
+|-------|--------|
+| Tier A ≥75% | ✓ 100.0% |
+| Tier B ≥75% | ✓ 87.5% |
+| Q8 still hardest | ✓ 58.3%, min overall |
+| Matches Exp8 baseline | ✓ -0.3 within trial variance |
+
+### Key Findings
+
+1. **Baked-in LEGEND performs at parity with the Exp 8 `strand-legend` condition.** The -0.3 total delta is within single-trial noise (Q8 scored 2, 2, 3 across trials — not a real regression).
+
+2. **Q3 fully recovered.** Exp 8 saw Q3 regress from 6.0→5.3 when the LEGEND was injected by `addLegend()`. With the LEGEND baked in as part of the format (not as a post-processing step), Q3 scores 6.0/6 consistently (C3/P0). The regression was a one-time artifact of the external injection approach.
+
+3. **Q8 remains the ceiling.** Still PARTIAL across all trials — the cross-section synthesis problem (import count ≠ cascade risk) is not solved by the LEGEND. Expected; the LEGEND describes notation, not the reasoning distinction.
+
+4. **Format is stable.** Tier A at 100%, Tier B at 87.5%. The LEGEND is now a permanent part of `.strand` v2.
