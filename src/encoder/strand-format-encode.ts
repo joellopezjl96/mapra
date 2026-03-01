@@ -20,7 +20,8 @@ export function encodeToStrandFormat(graph: StrandGraph, analysis?: GraphAnalysi
   let out = "";
 
   // Header
-  out += `STRAND v2 | ${graph.projectName} | ${capitalize(graph.framework)} | ${graph.totalFiles} files | ${graph.totalLines.toLocaleString()} lines\n\n`;
+  out += `STRAND v2 | ${graph.projectName} | ${capitalize(graph.framework)} | ${graph.totalFiles} files | ${graph.totalLines.toLocaleString()} lines\n`;
+  out += `LEGEND: ×N=imported by N files | █▓░·=complexity high→low | ═/·=coupling strong/weak | ×A→B=A direct, B total affected | dN=cascade depth | [AMP]=amplification≥2x | NL=lines of code\n\n`;
 
   // RISK first — highest signal for change-impact questions
   if (analysis) {
