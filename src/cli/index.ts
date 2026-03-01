@@ -109,7 +109,7 @@ async function runGenerate(targetArg?: string) {
       `  ${graph.totalFiles} files  ${graph.totalLines.toLocaleString()} lines  ${graph.modules.length} modules  ${riskCount} high-import files`,
     );
 
-    const analysis = analyzeGraph(graph);
+    const analysis = analyzeGraph(graph, targetPath);
     const encoded = encodeToStrandFormat(graph, analysis);
     const tokens = Math.round(encoded.length / 4);
 

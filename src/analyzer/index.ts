@@ -11,17 +11,19 @@ import {
   type BlastResult,
   computeAllBlastRadii,
 } from "./blast-radius.js";
+import { type ChurnResult, computeChurn } from "./churn.js";
 
 export interface GraphAnalysis {
   risk: BlastResult[];   // sorted by amplificationRatio desc
   deadCode: string[];    // node IDs with zero inbound edges (likely unused)
+  churn: Map<string, ChurnResult>;  // per-file git churn (30d window)
 }
 
 /**
  * Analyze a strand graph for structural risk patterns.
  * Returns sorted results ready for rendering.
  */
-export function analyzeGraph(graph: StrandGraph): GraphAnalysis {
+export function analyzeGraph(graph: StrandGraph, rootDir?: string): GraphAnalysis {
   // Build reverse adjacency once, excluding test edges
   const reverseAdj = buildReverseAdjacency(graph.edges, true);
 
@@ -45,7 +47,10 @@ export function analyzeGraph(graph: StrandGraph): GraphAnalysis {
     )
     .map((n) => n.id);
 
-  return { risk, deadCode };
+  const churn = rootDir ? computeChurn(rootDir) : new Map<string, ChurnResult>();
+
+  return { risk, deadCode, churn };
 }
 
 export type { BlastResult } from "./blast-radius.js";
+export type { ChurnResult } from "./churn.js";

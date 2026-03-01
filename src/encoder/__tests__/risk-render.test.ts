@@ -65,6 +65,7 @@ function makeAnalysis(): GraphAnalysis {
       },
     ],
     deadCode: [],
+    churn: new Map(),
   };
 }
 

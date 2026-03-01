@@ -28,6 +28,11 @@ export function encodeToStrandFormat(graph: StrandGraph, analysis?: GraphAnalysi
     out += renderRisk(graph, analysis);
   }
 
+  // CHURN — temporal change data
+  if (analysis) {
+    out += renderChurn(graph, analysis);
+  }
+
   // FLOWS second — relational context for navigation questions
   out += renderFlows(graph, analysis);
 
@@ -218,6 +223,32 @@ function renderRisk(graph: StrandGraph, analysis: GraphAnalysis): string {
   const remaining = analysis.risk.length - top.length;
   if (remaining > 0) {
     out += `  +${remaining} more with blast radius > 1\n`;
+  }
+
+  out += `\n`;
+  return out;
+}
+
+function renderChurn(graph: StrandGraph, analysis: GraphAnalysis): string {
+  if (!analysis.churn || analysis.churn.size === 0) return "";
+
+  // Get files with >= 3 commits (high churn)
+  const highChurn = [...analysis.churn.values()]
+    .filter((c) => c.commits30d >= 3)
+    .sort((a, b) => b.commits30d - a.commits30d)
+    .slice(0, 10);
+
+  if (highChurn.length === 0) return "";
+
+  let out = `─── CHURN (last 30 days, top movers) ─────────────────────\n`;
+
+  for (const c of highChurn) {
+    const commits = `${c.commits30d} commits`.padEnd(12);
+    const delta = `+${c.linesAdded30d} -${c.linesRemoved30d}`.padEnd(12);
+    const msg = c.lastCommitMsg.length > 50
+      ? c.lastCommitMsg.slice(0, 47) + "..."
+      : c.lastCommitMsg;
+    out += `${commits} ${delta} ${c.nodeId}  "${msg}"\n`;
   }
 
   out += `\n`;
