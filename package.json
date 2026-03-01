@@ -12,7 +12,8 @@
     "dev": "tsx",
     "scan": "tsx src/cli/scan.ts",
     "encode": "tsx src/encoder/encode.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "files": [
     "dist/",
@@ -38,9 +39,10 @@
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
+    "@types/node": "^25.3.2",
     "tree-sitter": "^0.21.1",
     "tree-sitter-typescript": "^0.23.2",
-    "@types/node": "^25.3.2",
-    "tsx": "^4.21.0"
+    "tsx": "^4.21.0",
+    "vitest": "^4.0.18"
   }
 }
