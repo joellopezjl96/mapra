@@ -33,6 +33,11 @@ export function encodeToStrandFormat(graph: StrandGraph, analysis?: GraphAnalysi
     out += renderChurn(graph, analysis);
   }
 
+  // CONVENTIONS — detected import patterns
+  if (analysis) {
+    out += renderConventions(analysis);
+  }
+
   // FLOWS second — relational context for navigation questions
   out += renderFlows(graph, analysis);
 
@@ -249,6 +254,26 @@ function renderChurn(graph: StrandGraph, analysis: GraphAnalysis): string {
       ? c.lastCommitMsg.slice(0, 47) + "..."
       : c.lastCommitMsg;
     out += `${commits} ${delta} ${c.nodeId}  "${msg}"\n`;
+  }
+
+  out += `\n`;
+  return out;
+}
+
+function renderConventions(analysis: GraphAnalysis): string {
+  if (!analysis.conventions || analysis.conventions.length === 0) return "";
+
+  // Cap at 8 conventions
+  const top = analysis.conventions.slice(0, 8);
+
+  let out = `─── CONVENTIONS ─────────────────────────────────────────\n`;
+
+  for (const c of top) {
+    const exports = c.anchorExports.slice(0, 3).join(", ");
+    const label = exports || c.anchorFile.split("/").pop()?.replace(/\.(ts|tsx|js|jsx)$/, "") || "?";
+    const coverage = `${c.adoption}/${c.total} ${c.consumerType}`;
+
+    out += `${label.padEnd(32)} ${coverage.padEnd(16)} ${c.anchorFile}\n`;
   }
 
   out += `\n`;

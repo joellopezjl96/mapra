@@ -12,11 +12,13 @@ import {
   computeAllBlastRadii,
 } from "./blast-radius.js";
 import { type ChurnResult, computeChurn } from "./churn.js";
+import { type Convention, detectConventions } from "./conventions.js";
 
 export interface GraphAnalysis {
   risk: BlastResult[];   // sorted by amplificationRatio desc
   deadCode: string[];    // node IDs with zero inbound edges (likely unused)
   churn: Map<string, ChurnResult>;  // per-file git churn (30d window)
+  conventions: Convention[];  // import patterns adopted by 60%+ of a file type
 }
 
 /**
@@ -48,9 +50,11 @@ export function analyzeGraph(graph: StrandGraph, rootDir?: string): GraphAnalysi
     .map((n) => n.id);
 
   const churn = rootDir ? computeChurn(rootDir) : new Map<string, ChurnResult>();
+  const conventions = detectConventions(graph.nodes, graph.edges);
 
-  return { risk, deadCode, churn };
+  return { risk, deadCode, churn, conventions };
 }
 
 export type { BlastResult } from "./blast-radius.js";
 export type { ChurnResult } from "./churn.js";
+export type { Convention } from "./conventions.js";
