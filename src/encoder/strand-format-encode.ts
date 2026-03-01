@@ -529,20 +529,7 @@ function renderFlowsFromHubs(
 
 function renderDeadCode(analysis: GraphAnalysis): string {
   if (!analysis.deadCode || analysis.deadCode.length === 0) return "";
-
-  const cap = 10;
-  const shown = analysis.deadCode.slice(0, cap);
-  const remaining = analysis.deadCode.length - shown.length;
-
-  let out = `─── DEAD CODE (${analysis.deadCode.length} unreachable files) ────────────────\n`;
-  for (const fileId of shown) {
-    out += `  ${fileId}\n`;
-  }
-  if (remaining > 0) {
-    out += `  +${remaining} more\n`;
-  }
-  out += `\n`;
-  return out;
+  return `─── DEAD CODE: ${analysis.deadCode.length} unreachable files ─────────────────\n`;
 }
 
 // ─── Helpers ────────────────────────────────────────────

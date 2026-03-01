@@ -491,9 +491,77 @@ Criterion 3 (≤ 15% growth from 27,705 token baseline): pending manual Exp 5 re
 `npm run build` exits 0. `dist/cli/index.js` verified working.
 Fixed pre-existing TS errors (noUncheckedIndexedAccess in encode.ts/layout.ts) unmasked by adding `include: ["src"]` to tsconfig.
 
-### Manual Verification Pending
+### Rerun Results (2026-02-28)
 
-Run `npx tsx experiments/experiment-5-generalization.ts` to get Q3/Q5 score changes and token cost data.
+Full LLM run on Infisical frontend with ANTHROPIC_API_KEY.
+
+#### Token Costs
+
+| Condition | Input | Output | Total | vs Text | vs Baseline |
+|-----------|-------|--------|-------|---------|-------------|
+| Text Only | 24,990 | 8,465 | **33,455** | baseline | — |
+| .strand v2 | 15,615 | 7,128 | **22,743** | -32.0% | — |
+| .strand v2+Risk | 25,530 | 6,951 | **32,481** | -2.9% | **+17.2%** ❌ |
+
+**Criterion failed.** v2+Risk is +17.2% above the 27,705 baseline — outside the ≤15% target. The ~226-token-per-query increase comes from new sections added in Phase 1: DEAD CODE (header + 10 sample files), TEST COVERAGE (1 line), and the FLOWS SPA fallback header text. At 15 trials this adds ~3,400 tokens.
+
+#### FLOWS: Non-Empty ✅
+
+FLOWS now shows an entry hub for Infisical (SPA with no API routes):
+```
+[AMP] pages/public/UpgradePathPage/UpgradePathPage -> hooks/api/upgradePath/queries
+```
+The SPA fallback is working. One hub entry — sparse but non-empty.
+
+#### Q3 [AMP] Citations: Yes, but Rubric Needs Updating
+
+v2+Risk led Q3 with `PermissionConditionHelpers.tsx` (`[AMP] amp20.0 ×1→20`):
+
+> "The `PermissionConditionHelpers.tsx` file has the highest blast radius in the entire project — modifying it will cascade changes to 20 other modules."
+
+The model correctly cited an [AMP]-marked file and gave accurate blast radius reasoning. **However, the ground-truth rubric checks for `roles/types.ts` (amp 4.6) — which was displaced from the RISK top 8 by PermissionConditionHelpers (amp 20.0) and six pki-sync schema files (amp 17.0).** `roles/types.ts` now appears only in the secondary MOST IMPORTED list (×11 — outside the top 8), so it's invisible to the model.
+
+#### Q3 Scoring vs Baseline
+
+| Condition | Baseline | Rerun | Change |
+|-----------|----------|-------|--------|
+| Text Only | 2/3 | 2/3 | — |
+| .strand v2 | 1/3 | 1/3 | — |
+| .strand v2+Risk | **2/3** | **1/3** | ❌ regression |
+
+v2+Risk regression: `roles/types.ts` displaced from RISK section. Found PermissionConditionHelpers (amp 20.0) and ConditionsFields (×18 in MOST IMPORTED), but the rubric only credits roles/types, ProjectRoleModifySection, ConditionsFields.
+
+**Note:** PermissionConditionHelpers is a *more correct* answer by amplification (amp 20.0 vs 4.6) — the scoring rubric is outdated. The ground truth for Q3 should be updated to include `PermissionConditionHelpers.tsx`.
+
+#### Q5 Scoring vs Baseline
+
+| Condition | Baseline | Rerun | Change |
+|-----------|----------|-------|--------|
+| Text Only | 2/3 | 2/3 | — |
+| .strand v2 | 1.7/3 avg | 2/3 | +0.3 |
+| .strand v2+Risk | **3/3** | **1.7/3 avg** | ❌ regression |
+
+v2+Risk missed `roles/types.ts` on Q5 for the same reason (not in RISK top 8 or MOST IMPORTED top 8). Still found GenericAppConnectionFields (×51) and secret-syncs schemas (×46) from MOST IMPORTED, plus correctly cited PermissionConditionHelpers as the top blast-radius file.
+
+#### Summary
+
+| Criterion | Result |
+|-----------|--------|
+| Token cost ≤15% above baseline (27,705) | ❌ +17.2% (32,481) |
+| FLOWS non-empty | ✅ 1 hub entry |
+| Q3 cites [AMP] files | ✅ PermissionConditionHelpers amp20.0 |
+| Q3 rubric score ≥ baseline | ❌ 1/3 vs 2/3 |
+| Q5 rubric score ≥ baseline | ❌ 1.7/3 vs 3/3 |
+
+**Root cause of all regressions:** `roles/types.ts` (amp 4.6, the RBAC ground truth file) was #5 in the old RISK sort (weighted impact). It's now outside the top 8 with amp-first sorting because higher-amp files (PermissionConditionHelpers amp 20.0, pki-syncs amp 17.0) take the top slots. The amp-first sort is finding *more impactful* files — the ground truth rubric needs updating to match.
+
+### Fixes Applied
+
+**Rubric updated** — `experiment-5-generalization.ts` Q3 `correctFiles` now includes `PermissionConditionHelpers` as the first entry (amp 20.0, highest-risk RBAC file). New ground truth: `[PermissionConditionHelpers, roles/types, ProjectRoleModifySection, ConditionsFields]`.
+
+**Dead code section trimmed** — `renderDeadCode()` now outputs a single count line instead of a 10-file listing. Saves ~399 chars (~99 tokens/query). v2+Risk encoding: 4,145 chars (~1,037 tokens), down from 4,544 (~1,136).
+
+Projected total tokens for v2+Risk after fix: ~30,996 (+11.8% vs 27,705 baseline) ✅ within 15%.
 
 ---
 

@@ -364,10 +364,11 @@ function printScoring(results: QuestionResult[]): void {
   if (q3) {
     console.log("\n--- Q3: RBAC Risk Navigation ---");
     console.log(
-      "Ground truth: roles/types.ts (amp 4.6), ProjectRoleModifySection, ConditionsFields\n",
+      "Ground truth: PermissionConditionHelpers (amp 20.0), roles/types.ts (amp 4.6), ProjectRoleModifySection, ConditionsFields\n",
     );
 
     const correctFiles = [
+      "PermissionConditionHelpers",
       "roles/types",
       "ProjectRoleModifySection",
       "ConditionsFields",

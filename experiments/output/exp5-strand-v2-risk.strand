@@ -1,48 +1,20 @@
 STRAND v2 | frontend | React | 3142 files | 347,568 lines
 
-─── TERRAIN ─────────────────────────────────────────────
-Module complexity heatmap (█=high ▓=mid ░=low ·=minimal)
-
-··········  pages          0.02 1735 files 242,080L  
-··········  hooks          0.01 652 files  43,590L  
-··········  components     0.01 619 files  42,818L  TLC, admin, kitchen, shared
-▓░········  src            0.15   7 files   9,578L  
-··········  layouts        0.01  47 files   3,115L  
-··········  views          0.03   8 files   2,318L  
-··········  helpers        0.01  22 files   1,517L  
-··········  context        0.01  17 files   1,117L  
-··········  lib            0.00  11 files     418L  auth, payment, POS, email
-··········  const          0.01   2 files     398L  
-··········  config         0.01   2 files     144L  
-··········  eslint.config.js 0.03   1 files     142L  
-··········  hoc            0.00   5 files      96L  
-··········  vite.config.ts 0.02   1 files      81L  
-··········  .storybook     0.00   2 files      52L  
-··········  types          0.00   5 files      39L  
-··········  decorators     0.00   3 files      34L  
-··········  scripts        0.00   1 files      24L  deploy, sync, broadcast
-··········  postcss.config.js 0.00   1 files       6L  
-··········  consts         0.00   1 files       1L  
-
-─── INFRASTRUCTURE ──────────────────────────────────────
-Inter-module dependency roads
-
-src          ═══════╢ pages          ×251  rendering:213 auth:38
-.storybook   ·······╢ decorators     × 1  data:1
-src          ·······╢ components     × 1  rendering:1
-src          ·······╢ hooks          × 1  rendering:1
-pages        ·······╢ hooks          × 1  rendering:1
-
-─── RISK (change with care) ─────────────────────────────
-src/pages/organization/AppConnections/AppConnectionsPage/components/AppConnectionForm/GenericAppConnectionFields.tsx  52 affected  depth 2  ×51 in  1 mod  amp 1.0
-src/components/secret-syncs/forms/schemas/index.ts  46 affected  depth 1  ×46 in  1 mod  amp 1.0
-src/pages/secret-manager/IntegrationsListPage/components/SecretSyncsTab/SecretSyncTable/SecretSyncTableCell.tsx  38 affected  depth 2  ×36 in  1 mod  amp 1.1
-src/pages/secret-manager/IntegrationsListPage/components/SecretSyncsTab/SecretSyncTable/helpers/index.ts  37 affected  depth 2  ×36 in  1 mod  amp 1.0
-src/hooks/api/roles/types.ts              51 affected  depth 5  ×11 in  1 mod  amp 4.6
-src/components/v3/utils/index.ts          31 affected  depth 2  ×26 in  1 mod  amp 1.2
-src/hooks/api/projects/types.ts           37 affected  depth 4  ×11 in  1 mod  amp 3.4
-src/hooks/api/appConnections/queries.tsx  24 affected  depth 1  ×24 in  1 mod  amp 1.0
+─── RISK (blast radius — modifying these cascades broadly) ─
+[AMP] amp20.0 ×1→20     d3   1mod  src/pages/project/RoleDetailsBySlugPage/components/PermissionConditionHelpers.tsx
+[AMP] amp17.0 ×1→17     d2   1mod  src/components/pki-syncs/forms/schemas/aws-certificate-manager-pki-sync-destination-schema.ts
+[AMP] amp17.0 ×1→17     d2   1mod  src/components/pki-syncs/forms/schemas/aws-elastic-load-balancer-pki-sync-destination-schema.ts
+[AMP] amp17.0 ×1→17     d2   1mod  src/components/pki-syncs/forms/schemas/aws-secrets-manager-pki-sync-destination-schema.ts
+[AMP] amp17.0 ×1→17     d2   1mod  src/components/pki-syncs/forms/schemas/azure-key-vault-pki-sync-destination-schema.ts
+[AMP] amp17.0 ×1→17     d2   1mod  src/components/pki-syncs/forms/schemas/chef-pki-sync-destination-schema.ts
+[AMP] amp17.0 ×1→17     d2   1mod  src/components/pki-syncs/forms/schemas/cloudflare-custom-certificate-pki-sync-destination-schema.ts
+[AMP] amp12.0 ×1→12     d2   1mod  src/components/secret-scanning/forms/schemas/bitbucket-data-source-schema.ts
   +1053 more with blast radius > 1
+
+─── FLOWS (entry hubs) ──────────────────────────────────
+High-amplification hubs and their cross-module dependencies
+
+[AMP] pages/public/UpgradePathPage/UpgradePathPage -> hooks/api/upgradePath/queries
 
 ─── HOTSPOTS (complexity > 0.3) ─────────────────────────
 1.00  src/routeTree.gen.ts                                 8791L 250imp 
@@ -57,5 +29,39 @@ src/hooks/api/appConnections/queries.tsx  24 affected  depth 1  ×24 in  1 mod  
 ×18  src/pages/project/RoleDetailsBySlugPage/components/ConditionsFields.tsx
 ×16  src/components/pki-syncs/forms/schemas/pki-sync-schema.ts
 
+─── TERRAIN ─────────────────────────────────────────────
+Module complexity heatmap (█=high ▓=mid ░=low ·=minimal)
+
+··········  pages          0.02 1735 files 242,080L  GenericAppConnectionFields, index, SecretSyncTableCell
+··········  hooks          0.01 652 files  43,590L  queries, enums, types
+··········  components     0.01 619 files  42,818L  index, index, pki-sync-schema
+▓░········  src            0.15   7 files   9,578L  GenericAppConnectionFields, index, index
+··········  layouts        0.01  47 files   3,115L  index, index, index
+··········  views          0.03   8 files   2,318L  pki-alert-formatters, CreatePkiAlertV2FormSteps, CreatePkiAlertV2Modal
+··········  helpers        0.01  22 files   1,517L  
+··········  context        0.01  17 files   1,117L  types, types
+··········  lib            0.00  11 files     418L  
+··········  const          0.01   2 files     398L  
+··········  config         0.01   2 files     144L  
+··········  eslint.config.js 0.03   1 files     142L  
+··········  hoc            0.00   5 files      96L  
+··········  vite.config.ts 0.02   1 files      81L  
+··········  .storybook     0.00   2 files      52L  index
+··········  types          0.00   5 files      39L  
+··········  decorators     0.00   3 files      34L  index
+··········  scripts        0.00   1 files      24L  
+··········  postcss.config.js 0.00   1 files       6L  
+··········  consts         0.00   1 files       1L  
+
+─── INFRASTRUCTURE ──────────────────────────────────────
+Inter-module dependency roads
+
+src          ═══════╢ pages          ×251  rendering:213 auth:38
+.storybook   ·······╢ decorators     × 1  data:1
+src          ·······╢ components     × 1  rendering:1
+src          ·······╢ hooks          × 1  rendering:1
+pages        ·······╢ hooks          × 1  rendering:1
+
 ─── TEST COVERAGE ───────────────────────────────────────
 0 test files | 0/3139 testable files with direct test edges (0.0%)
+─── DEAD CODE: 1164 unreachable files ─────────────────
