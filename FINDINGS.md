@@ -698,3 +698,46 @@ By token efficiency, Sonnet+v2Risk wins (2.39). But by dollar efficiency, Haiku'
 4. **Token count is a poor proxy for cost.** All conditions used similar token counts (±7.6%), but actual cost varied by 5×. Model choice dominates cost; encoding choice dominates quality.
 
 5. **Sonnet + v2+Risk is the optimal single encoding.** Better cost-efficiency than Sonnet+Text (2.39 vs 2.31), better Q3 file quality, no regressions anywhere.
+
+---
+
+## Experiment 7: CLI + CLAUDE.md Integration (Real Session Test)
+
+**Date:** 2026-02-28
+**Method:** `strand generate` + `strand init` → new Claude Code session in SenorBurritoCompany
+**Question asked:** "If we were to refactor the codebase, where would we start?"
+
+### Setup
+
+`.strand` generated via `node dist/cli/index.js generate C:/dev/senorburritocompany`
+`.strand` wired via `strand init` (already wired from prior session — idempotent check passed)
+New Claude Code session opened cold in project root.
+
+### Result
+
+**Tool calls: 0**
+
+Claude answered entirely from `.strand` context loaded at session start via `@.strand` in CLAUDE.md.
+
+Response cited specific encoded data without opening any files:
+- 51 unreachable (dead) files
+- `orders/route.ts` — 661L, complexity 0.78
+- `auth/register/route.ts` — 373L, complexity 0.51
+- `ordering-server.ts` — blast radius 7→23 downstream
+- `ordering.ts` — ×24 imports
+- `docs/KNOWN_TEST_ISSUES.md` — from FLOWS section
+
+Delivered a prioritized 5-step refactoring roadmap with a triage table.
+
+### Baseline Comparison
+
+| Session | Tool calls | Tokens | Method |
+|---------|-----------|--------|--------|
+| Session 1 (no .strand) | 45 | 70,800 | Explored files directly |
+| Session 7 (with .strand) | 0 | ~800 (estimate) | Read from context |
+
+### Key Finding
+
+**`.strand` in CLAUDE.md eliminates exploratory tool calls entirely for structural questions.** The model answered with higher specificity (exact line counts, complexity scores, blast radius numbers) than Session 1 achieved after 45 tool calls, because the encoding surfaces those metrics directly.
+
+The CLAUDE.md `@.strand` injection via `strand init` works as designed — the encoding survives session start and is immediately available without any tool use.
