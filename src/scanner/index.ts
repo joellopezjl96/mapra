@@ -32,6 +32,7 @@ export interface StrandNode {
     metadata: Record<string, unknown>;
   };
   complexity: number; // 0-1 normalized
+  domain?: string;    // business domain (e.g. "secrets", "pki", "auth")
   children?: string[]; // child node IDs (for modules)
 }
 
@@ -145,6 +146,58 @@ function detectFramework(rootDir: string): FrameworkInfo {
   return { name: "typescript", type: "TypeScript", srcDir: "src" };
 }
 
+/**
+ * Detect the business domain for a file.
+ * Priority: TanStack Router route > Next.js route path > barrel file > directory fallback.
+ */
+function detectDomain(
+  relativePath: string,
+  content: string,
+  frameworkMeta: StrandNode["framework"] | null,
+): string | undefined {
+  // 1. TanStack Router: createFileRoute('/secrets/detail') → "secrets"
+  const tanstackMatch = content.match(
+    /createFileRoute\s*\(\s*['"`]([^'"`]+)['"`]\s*\)/,
+  );
+  if (tanstackMatch && tanstackMatch[1]) {
+    const firstSegment = tanstackMatch[1].split("/").filter(Boolean)[0];
+    if (firstSegment && firstSegment !== "_authenticated") return firstSegment;
+  }
+
+  // 2. Next.js route path from framework metadata
+  if (frameworkMeta?.type === "nextjs-page" || frameworkMeta?.type === "nextjs-api") {
+    const routePath = frameworkMeta.metadata?.["routePath"] as string | undefined;
+    if (routePath) {
+      const firstSegment = routePath.split("/").filter(Boolean)[0];
+      if (firstSegment) return firstSegment.replace(/\[.*\]/, "").replace(/-/g, "_") || undefined;
+    }
+  }
+
+  // 3. Barrel file: index.ts/tsx where >50% of content is re-exports → parent dir name
+  const isBarrel =
+    relativePath.endsWith("/index.ts") ||
+    relativePath.endsWith("/index.tsx") ||
+    relativePath.endsWith("/index.js") ||
+    relativePath.endsWith("/index.jsx");
+  if (isBarrel) {
+    const reExportCount = (
+      content.match(/export\s+\{[^}]+\}\s+from\s+['"]/g) || []
+    ).length;
+    const totalExports = (content.match(/^export\s/gm) || []).length;
+    if (reExportCount > 2 && totalExports > 0 && reExportCount / totalExports > 0.5) {
+      const parts = relativePath.split("/");
+      // parent directory name (e.g. src/components/secrets/index.ts → "secrets")
+      return parts[parts.length - 2];
+    }
+  }
+
+  // 4. Fallback: second path segment (e.g. src/components → "components", src/hooks → "hooks")
+  const parts = relativePath.split("/");
+  if (parts.length > 2) return parts[1];
+  if (parts.length === 2) return parts[0];
+  return undefined;
+}
+
 function walkDir(
   dir: string,
   rootDir: string,
@@ -169,6 +222,9 @@ function walkDir(
       const exports = extractExports(content);
       const type = classifyFile(relativePath, content, framework);
 
+      // Add framework metadata first (domain detection uses it)
+      const fwMeta = extractFrameworkMetadata(relativePath, content, framework);
+
       const node: StrandNode = {
         id: relativePath,
         path: relativePath,
@@ -178,10 +234,9 @@ function walkDir(
         imports,
         exports,
         complexity: 0,
+        domain: detectDomain(relativePath, content, fwMeta),
       };
 
-      // Add framework metadata
-      const fwMeta = extractFrameworkMetadata(relativePath, content, framework);
       if (fwMeta) {
         node.framework = fwMeta;
       }
