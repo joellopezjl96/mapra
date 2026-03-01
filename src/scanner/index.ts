@@ -191,8 +191,14 @@ function detectDomain(
     }
   }
 
-  // 4. Fallback: second path segment (e.g. src/components → "components", src/hooks → "hooks")
+  // 4. Fallback: go one level deeper inside known framework buckets
   const parts = relativePath.split("/");
+  const FRAMEWORK_BUCKETS = new Set([
+    "components", "hooks", "pages", "views", "layouts", "features", "modules",
+  ]);
+  if (parts.length >= 4 && FRAMEWORK_BUCKETS.has(parts[1] ?? "")) {
+    return parts[2] ?? parts[1] ?? "root";  // e.g. "pki-syncs", "secret-manager", "api"
+  }
   if (parts.length > 2) return parts[1];
   if (parts.length === 2) return parts[0];
   return undefined;

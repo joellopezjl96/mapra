@@ -34,6 +34,9 @@ export function encodeToStrandFormat(graph: StrandGraph, analysis?: GraphAnalysi
   out += renderHotspots(graph);
   out += renderMostImported(graph);
 
+  // DOMAINS — semantic feature domain inventory
+  out += renderDomains(graph);
+
   // TERRAIN — orientation heatmap
   out += renderTerrain(graph);
 
@@ -53,6 +56,32 @@ export function encodeToStrandFormat(graph: StrandGraph, analysis?: GraphAnalysi
   }
 
   return out;
+}
+
+function renderDomains(graph: StrandGraph): string {
+  const counts = new Map<string, number>();
+  for (const node of graph.nodes) {
+    const d = node.domain ?? "unknown";
+    counts.set(d, (counts.get(d) ?? 0) + 1);
+  }
+
+  // Drop generic filesystem buckets that aren't domains
+  const EXCLUDE = new Set(["pages", "hooks", "components", "lib", "utils", "types",
+                            "config", "layouts", "views", "helpers", "context"]);
+
+  const domains = [...counts.entries()]
+    .filter(([name]) => !EXCLUDE.has(name))
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 24);
+
+  if (domains.length === 0) return "";
+
+  const lines = ["─── DOMAINS " + "─".repeat(40), "Feature domains by file count\n"];
+  for (const [name, count] of domains) {
+    lines.push(`${name.padEnd(28)} ${String(count).padStart(4)} files`);
+  }
+  lines.push("");
+  return lines.join("\n") + "\n";
 }
 
 function renderTerrain(graph: StrandGraph): string {
