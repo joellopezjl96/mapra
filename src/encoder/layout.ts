@@ -159,7 +159,7 @@ function positionNodesInModules(
   // Assign nodes to modules
   for (const node of nodes) {
     const parts = node.path.split("/");
-    const moduleKey = parts.length > 2 ? parts.slice(0, 2).join("/") : parts[0];
+    const moduleKey = parts.length > 2 ? parts.slice(0, 2).join("/") : (parts[0] ?? "");
     const layoutMod = moduleMap.get(moduleKey);
 
     if (!layoutMod) continue;

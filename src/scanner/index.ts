@@ -234,8 +234,10 @@ function walkDir(
         imports,
         exports,
         complexity: 0,
-        domain: detectDomain(relativePath, content, fwMeta),
       };
+
+      const domain = detectDomain(relativePath, content, fwMeta);
+      if (domain !== undefined) node.domain = domain;
 
       if (fwMeta) {
         node.framework = fwMeta;
@@ -556,7 +558,7 @@ function detectModules(
   for (const node of nodes) {
     const parts = node.path.split("/");
     // Use first 2 levels for grouping (e.g., "src/lib", "src/components", "src/app")
-    const moduleKey = parts.length > 2 ? parts.slice(0, 2).join("/") : parts[0];
+    const moduleKey = parts.length > 2 ? parts.slice(0, 2).join("/") : (parts[0] ?? "");
     if (!dirGroups.has(moduleKey)) {
       dirGroups.set(moduleKey, []);
     }

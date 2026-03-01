@@ -183,7 +183,7 @@ function positionNodesInModules(
   // Assign nodes to modules
   for (const node of nodes) {
     const parts = node.path.split("/");
-    const moduleKey = parts.length > 2 ? parts.slice(0, 2).join("/") : parts[0];
+    const moduleKey = parts.length > 2 ? parts.slice(0, 2).join("/") : (parts[0] ?? "");
     const layoutMod = moduleMap.get(moduleKey);
 
     if (!layoutMod) continue;
@@ -196,7 +196,7 @@ function positionNodesInModules(
       x: 0,
       y: 0,
       radius,
-      color: TYPE_COLORS[node.type] || TYPE_COLORS.utility,
+      color: TYPE_COLORS[node.type] ?? TYPE_COLORS["utility"] ?? "#888",
     };
 
     layoutMod.nodes.push(layoutNode);
@@ -209,8 +209,8 @@ function positionNodesInModules(
     const centerY = mod.y + mod.height / 2 + 10; // offset for label
 
     if (mod.nodes.length === 1) {
-      mod.nodes[0].x = centerX;
-      mod.nodes[0].y = centerY;
+      const singleNode = mod.nodes[0];
+      if (singleNode) { singleNode.x = centerX; singleNode.y = centerY; }
       continue;
     }
 
@@ -235,10 +235,12 @@ function positionNodesInModules(
     const maxR = Math.min(mod.width, mod.height) / 2 - 25;
 
     for (let i = 0; i < mod.nodes.length; i++) {
+      const n = mod.nodes[i];
+      if (!n) continue;
       const angle = i * angleStep * 1.618; // golden angle for even distribution
       const r = (maxR * Math.sqrt(i + 1)) / Math.sqrt(mod.nodes.length);
-      mod.nodes[i].x = centerX + r * Math.cos(angle);
-      mod.nodes[i].y = centerY + r * Math.sin(angle);
+      n.x = centerX + r * Math.cos(angle);
+      n.y = centerY + r * Math.sin(angle);
     }
   }
 

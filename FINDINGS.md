@@ -448,3 +448,45 @@ No meaningful difference. All conditions correctly identified the most complex f
 | `experiments/output/exp4-strand-v2.strand` | Exp 4 v2 encoding snapshot |
 | `experiments/output/experiment-5-results.json` | Exp 5 raw results |
 | `experiments/output/exp5-strand-v2-risk.strand` | Exp 5 v2+Risk encoding snapshot |
+
+---
+
+## Experiment 5 Rerun: Phase 1 Improvements Validation
+
+**Date:** 2026-02-28
+**Changes from Phase 1:**
+- RISK sorted by amplificationRatio (was weightedImpact)
+- RISK rows: amp-first, [AMP] marker for ratio ≥ 2.0, ×N→M compact notation
+- Sections reordered: RISK + FLOWS first (highest-signal sections)
+- FLOWS SPA fallback for non-API codebases (hub detection)
+- moduleDescription() computed from graph (was hardcoded SBC strings)
+
+### RISK Ranking Change
+
+The new sort puts high-amplification files first. For Infisical frontend:
+
+| Before | After | File |
+|--------|-------|------|
+| ~#5 | **#1** | PermissionConditionHelpers.tsx (amp 20.0, ×1→20) |
+| mixed | #2-7 | pki-syncs schema files (amp 17.0 each, ×1→17) |
+
+All top results carry `[AMP]` marker (ratio ≥ 2.0). Compact notation `×1→20 d3 1mod` replaces verbose `1 direct  20 affected  depth 3  1 mod  amp 20.0`.
+
+### FLOWS
+
+Before: empty for Infisical (SPA, no API routes)
+After: shows entry hubs — `pages/public/UpgradePathPage/UpgradePathPage -> hooks/api/upgradePath/queries`
+
+### Token Costs
+
+Infisical .strand: 4,544 chars ~1,136 tokens (down from ~11k chars for SBC)
+Criterion 3 (≤ 15% growth from 27,705 token baseline): pending manual Exp 5 rerun
+
+### Build Status
+
+`npm run build` exits 0. `dist/cli/index.js` verified working.
+Fixed pre-existing TS errors (noUncheckedIndexedAccess in encode.ts/layout.ts) unmasked by adding `include: ["src"]` to tsconfig.
+
+### Manual Verification Pending
+
+Run `npx tsx experiments/experiment-5-generalization.ts` to get Q3/Q5 score changes and token cost data.
