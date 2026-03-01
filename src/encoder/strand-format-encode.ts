@@ -381,7 +381,7 @@ function shortenPath(fullPath: string): string {
  * This design handles star patterns (one hub importing many leaves) correctly,
  * which is the actual topology of business logic in Next.js API routes.
  */
-function renderFlows(graph: StrandGraph): string {
+function renderFlows(graph: StrandGraph, analysis?: GraphAnalysis): string {
   // 1. Build adjacency from ALL non-test import edges across sub-modules
   const adj = new Map<string, Set<string>>();
 
@@ -401,7 +401,11 @@ function renderFlows(graph: StrandGraph): string {
     .filter((n) => n.type === "api-route" && adj.has(n.id))
     .sort((a, b) => b.complexity - a.complexity);
 
-  if (entryPoints.length === 0) return "";
+  // SPA fallback: no API routes — use top hub files by amplification ratio
+  if (entryPoints.length === 0) {
+    if (!analysis || analysis.risk.length === 0) return "";
+    return renderFlowsFromHubs(graph, analysis, adj);
+  }
 
   // 3. Build flow entries: each entry point + its cross-sub-module deps
   interface FlowEntry {
@@ -469,6 +473,49 @@ function renderFlows(graph: StrandGraph): string {
         out += `${"".padEnd(12)}${entryStr} -> ${depStr}\n`;
       }
     }
+  }
+
+  out += `\n`;
+  return out;
+}
+
+/**
+ * SPA fallback for FLOWS: use high-amplification hub files as implicit entry points.
+ * Shows their cross-module dependencies in the same format as API-route FLOWS.
+ */
+function renderFlowsFromHubs(
+  graph: StrandGraph,
+  analysis: GraphAnalysis,
+  adj: Map<string, Set<string>>,
+): string {
+  // Take top 5 by amplificationRatio that have cross-module outgoing edges
+  const hubs = analysis.risk
+    .filter((r) => adj.has(r.nodeId))
+    .slice(0, 5);
+
+  if (hubs.length === 0) return "";
+
+  let out = `─── FLOWS (entry hubs) ──────────────────────────────────\n`;
+  out += `High-amplification hubs and their cross-module dependencies\n\n`;
+
+  const nodeMap = new Map(graph.nodes.map((n) => [n.id, n]));
+
+  for (const hub of hubs) {
+    const deps = [...(adj.get(hub.nodeId) || [])];
+    if (deps.length === 0) continue;
+
+    // Sort deps by complexity
+    deps.sort((a, b) => {
+      const ca = nodeMap.get(a)?.complexity ?? 0;
+      const cb = nodeMap.get(b)?.complexity ?? 0;
+      return cb - ca;
+    });
+
+    const entryStr = shortenPath(hub.nodeId);
+    const depStr = deps.map((p) => shortenPath(p)).join(", ");
+    const marker = hub.amplificationRatio >= 2.0 ? "[AMP]" : "     ";
+
+    out += `${marker} ${entryStr} -> ${depStr}\n`;
   }
 
   out += `\n`;
