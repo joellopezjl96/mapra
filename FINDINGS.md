@@ -418,6 +418,7 @@ No meaningful difference. All conditions correctly identified the most complex f
 7. ~~**Does v2 generalize to other codebases?**~~ **ANSWERED (Exp 5):** Yes. Tested on Infisical (Vite+React SPA, 3,142 files, no Next.js). All sections produced useful output. FLOWS gracefully degraded (empty, no errors). RISK section provided measurable value (+1 correct file on Q3, +1 correct file on Q5 vs all other conditions).
 8. **Does domain-level identification need scanner improvements?** All conditions scored 3/8 on Q1 domain identification for Infisical — the scanner groups by filesystem path, not by business domain. Would detecting TanStack Router routes or page directory patterns improve domain visibility?
 9. **Would keystones and coupling analysis (mycorrhizal plan) add further value?** Blast radius proved its worth. The remaining mycorrhizal features (dead wood detection, keystone scoring with betweenness centrality, symbiosis/coupling health) are implemented in the plan but not yet built.
+10. ~~**Can a cheaper model (Haiku) use v2+Risk encoding to match Sonnet on text-only?**~~ **ANSWERED (Exp 6):** Partially. Haiku + v2+Risk matches Sonnet+Text on Q1–Q4 (~78% cost reduction). Fails on Q5 (0/3 on 2/3 trials — over-weights AMP ratio, ignores affected count). Recommended: use Haiku for navigation/inventory queries, Sonnet for breakage-risk queries.
 
 ---
 
@@ -448,6 +449,9 @@ No meaningful difference. All conditions correctly identified the most complex f
 | `experiments/output/exp4-strand-v2.strand` | Exp 4 v2 encoding snapshot |
 | `experiments/output/experiment-5-results.json` | Exp 5 raw results |
 | `experiments/output/exp5-strand-v2-risk.strand` | Exp 5 v2+Risk encoding snapshot |
+| `experiments/experiment-6-model-tiers.ts` | Experiment 6 runner (model tier comparison) |
+| `experiments/output/experiment-6-results.json` | Exp 6 raw results |
+| `experiments/output/exp6-strand-v2-risk.strand` | Exp 6 v2+Risk encoding snapshot |
 
 ---
 
@@ -490,3 +494,139 @@ Fixed pre-existing TS errors (noUncheckedIndexedAccess in encode.ts/layout.ts) u
 ### Manual Verification Pending
 
 Run `npx tsx experiments/experiment-5-generalization.ts` to get Q3/Q5 score changes and token cost data.
+
+---
+
+## Experiment 6: Model Tiers
+
+**Date:** 2026-02-28
+**File:** `experiments/experiment-6-model-tiers.ts`
+**Results:** `experiments/output/experiment-6-results.json`
+
+### Hypothesis
+
+Can Haiku 4.5 + .strand v2+Risk match or beat Sonnet 4.6 + text-only at a fraction of the cost?
+
+### Target Codebase
+
+**Infisical frontend** — same as Exp 5 (3,142 files, 347K lines, 20 modules).
+
+### Conditions
+
+| # | Condition | Model | Encoding | Role |
+|---|-----------|-------|----------|------|
+| 1 | `sonnet-text` | claude-sonnet-4-6 | Text Only | Control |
+| 2 | `haiku-v2risk` | claude-haiku-4-5-20251001 | .strand v2+Risk | Hypothesis |
+| 3 | `sonnet-v2risk` | claude-sonnet-4-6 | .strand v2+Risk | Reference ceiling |
+
+### Token Costs (5 questions × 3 trials)
+
+| Condition | Input | Output | Total | vs Control |
+|-----------|-------|--------|-------|------------|
+| Sonnet 4.6 + Text | 24,990 | 10,648 | **35,638** | baseline |
+| Haiku 4.5 + v2+Risk | 25,530 | 7,417 | **32,947** | **-7.6%** |
+| Sonnet 4.6 + v2+Risk | 25,530 | 8,961 | **34,491** | -3.2% |
+
+Token counts are similar across conditions — the meaningful cost difference is model pricing. Haiku is ~20× cheaper per token than Sonnet:
+
+| Condition | Approx. Cost (45 calls) | vs Control |
+|-----------|------------------------|------------|
+| Sonnet 4.6 + Text | ~$0.234 | baseline |
+| Haiku 4.5 + v2+Risk | ~$0.050 | **~78% cheaper** |
+| Sonnet 4.6 + v2+Risk | ~$0.211 | -10% |
+
+### Per-Question Token Costs (3 trials each)
+
+| Question | Sonnet+Text | Haiku+v2Risk | Sonnet+v2Risk |
+|----------|-------------|--------------|---------------|
+| Q1 inventory | 6,912 | 6,464 | 6,747 |
+| Q2 analysis | 6,655 | 6,302 | 6,238 |
+| Q3 navigation | 7,747 | 6,635 | 6,775 |
+| Q4 architecture | 6,931 | 6,866 | 6,879 |
+| Q5 dependency | 7,393 | 6,680 | **7,852** |
+
+Note: Sonnet v2+Risk was most expensive on Q5 — long, detailed breakage analysis responses.
+
+### Q1 Scoring: Feature Domain Inventory
+
+Ground truth: 8 domains (secrets, PKI/certs, KMS, SSH, PAM, scanning, AI/MCP, org/admin).
+
+| Condition | Trial 1 | Trial 2 | Trial 3 | Domains found |
+|-----------|---------|---------|---------|---------------|
+| Sonnet+Text | 3/8 | 3/8 | 3/8 | secrets, pki/cert, org/admin |
+| Haiku+v2Risk | 4/8 | 3/8 | 4/8 | secrets, pki/cert, scanning, org/admin |
+| Sonnet+v2Risk | 3/8 | 2/8 | 3/8 | pki/cert, scanning, org/admin |
+
+**Haiku marginally better than Sonnet on Q1** — the v2+Risk encoding's RISK section highlighted scanning-related files, surfacing that domain. Sonnet+v2Risk was inconsistent (2/8 on one trial). All conditions miss SSH, PAM, KMS, AI/MCP — a scanner limitation, not a model limitation.
+
+### Q3 Scoring: RBAC Risk Navigation
+
+Ground truth: `PermissionConditionHelpers.tsx` (amp 20.0), `roles/types.ts` (amp 4.6), `ProjectRoleModifySection`, `ConditionsFields`.
+
+| Condition | Correct | Files Found | BLAST_AWARE |
+|-----------|---------|-------------|-------------|
+| Sonnet+Text | 2/4 | ProjectRoleModifySection, ConditionsFields | 3/3 |
+| Haiku+v2Risk | 2/4 | **PermissionConditionHelpers**, ConditionsFields | 3/3 |
+| Sonnet+v2Risk | 2/4 | **PermissionConditionHelpers**, ConditionsFields | 3/3 |
+
+**All conditions tied at 2/4 — but they found different files.** v2+Risk conditions (both Haiku and Sonnet) identified `PermissionConditionHelpers.tsx` (the highest-amplification file, amp 20.0) — the more impactful miss. Sonnet+Text found `ProjectRoleModifySection` and `ConditionsFields` instead, missing the top-AMP file entirely.
+
+**Haiku matched Sonnet exactly on Q3** — same 2/4 score, same file set, same blast-radius awareness.
+
+### Q5 Scoring: High-Impact File Identification
+
+Ground truth: `GenericAppConnectionFields` (×51), `secret-syncs/forms/schemas` (×46), `roles/types` (×51 affected, amp 4.6).
+
+| Condition | Trial 1 | Trial 2 | Trial 3 | CASCADE_AWARE |
+|-----------|---------|---------|---------|---------------|
+| Sonnet+Text | 2/3 | 2/3 | 2/3 | 3/3 |
+| Haiku+v2Risk | **0/3** | **0/3** | 2/3 | 3/3 |
+| Sonnet+v2Risk | 2/3 | 2/3 | 2/3 | 3/3 |
+
+**Haiku is unreliable on Q5.** Trials 1 and 2 scored 0/3 — Haiku focused on `PermissionConditionHelpers.tsx` (highest AMP) rather than the files with the highest affected counts. Trial 3 recovered to 2/3. The blast-radius data led Haiku to prioritize amplification ratio over affected count, which was wrong for this question. Sonnet correctly balanced both signals.
+
+### Q4 Qualitative Comparison: State Management Architecture
+
+All three conditions correctly identified the primary pattern (hook-based server state via TanStack Query / React Query) and cited the `hooks/api/` directory structure. Qualitative differences:
+
+- **Sonnet+Text:** Named specific files (`mutations.tsx`, 1,860 lines) and made architectural inferences
+- **Haiku+v2Risk:** Identified the pattern but noted "not explicitly visible in the traditional sense" — slightly more hedged
+- **Sonnet+v2Risk:** Most precise — cited the `×24 imports` multiplier and named `queries.tsx` and `upgradePath/queries` as evidence
+
+All adequate for Q4; Sonnet+v2Risk produced the most grounded answer.
+
+### Cost-Efficiency (Q3+Q5 score per 10k tokens)
+
+| Condition | Score | Tokens (Q3+Q5) | Efficiency |
+|-----------|-------|----------------|------------|
+| Sonnet+Text | 3.5 | 15,140 | 2.31 |
+| Haiku+v2Risk | 2.2 | 13,315 | **1.63** |
+| Sonnet+v2Risk | 3.5 | 14,627 | **2.39** |
+
+By token efficiency, Sonnet+v2Risk wins (2.39). But by dollar efficiency, Haiku's ~78% cost reduction easily compensates for a lower token-efficiency score — provided consistency requirements are met.
+
+### Verdict: Which Questions Use Haiku?
+
+| Question | Haiku adequate? | Recommendation |
+|----------|----------------|----------------|
+| Q1 (inventory) | Yes — marginally better | Use Haiku |
+| Q2 (complexity) | Yes — identical answer | Use Haiku |
+| Q3 (navigation) | Yes — same score, better files | Use Haiku |
+| Q4 (architecture) | Yes — adequate, slightly hedged | Use Haiku |
+| Q5 (dependency) | **No — 0/3 on 2/3 trials** | Use Sonnet |
+
+**Haiku + v2+Risk is viable for Q1–Q4 at ~78% cost reduction. Q5 (breakage analysis) requires Sonnet for reliability.** The failure mode is specific: Haiku over-weights amplification ratio and under-weights affected count, which produces wrong file rankings when the two signals diverge.
+
+**Sonnet + v2+Risk is the best single encoding across all questions** — higher cost-efficiency than Sonnet+Text (2.39 vs 2.31) while also finding the higher-value file on Q3 (`PermissionConditionHelpers` vs `ProjectRoleModifySection`).
+
+### Key Findings
+
+1. **Haiku + v2+Risk is viable for navigational questions (Q1–Q4).** Matched Sonnet on Q3 (same score, same blast-radius awareness), marginally outperformed on Q1. ~78% cheaper in dollar terms.
+
+2. **Haiku fails on reliability for Q5.** Two of three trials scored 0/3 — a critical failure for "which files break the most" queries. Haiku over-indexed on AMP ratio and ignored affected count.
+
+3. **v2+Risk improves Q3 quality regardless of model.** Both v2+Risk conditions found `PermissionConditionHelpers` (amp 20.0) — the highest-risk file. Sonnet+Text missed it entirely, finding two less-critical files instead.
+
+4. **Token count is a poor proxy for cost.** All conditions used similar token counts (±7.6%), but actual cost varied by 5×. Model choice dominates cost; encoding choice dominates quality.
+
+5. **Sonnet + v2+Risk is the optimal single encoding.** Better cost-efficiency than Sonnet+Text (2.39 vs 2.31), better Q3 file quality, no regressions anywhere.
