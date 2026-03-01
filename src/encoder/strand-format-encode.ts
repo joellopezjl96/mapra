@@ -25,7 +25,7 @@ export function encodeToStrandFormat(graph: StrandGraph, analysis?: GraphAnalysi
 
   // RISK first — highest signal for change-impact questions
   if (analysis) {
-    out += renderRisk(analysis);
+    out += renderRisk(graph, analysis);
   }
 
   // FLOWS second — relational context for navigation questions
@@ -179,9 +179,18 @@ function renderInfrastructure(graph: StrandGraph): string {
   return out;
 }
 
-function renderRisk(analysis: GraphAnalysis): string {
+function renderRisk(graph: StrandGraph, analysis: GraphAnalysis): string {
   const top = analysis.risk.slice(0, 8);
   if (top.length === 0) return "";
+
+  // Build node lookup and test edge counts
+  const nodeMap = new Map(graph.nodes.map((n) => [n.id, n]));
+  const testCounts = new Map<string, number>();
+  for (const edge of graph.edges) {
+    if (edge.type === "tests") {
+      testCounts.set(edge.to, (testCounts.get(edge.to) ?? 0) + 1);
+    }
+  }
 
   let out = `─── RISK (blast radius — modifying these cascades broadly) ─\n`;
 
@@ -192,8 +201,18 @@ function renderRisk(analysis: GraphAnalysis): string {
     const flow = `×${r.directImporters}→${r.affectedCount}`.padEnd(9);
     const depth = `d${r.maxDepth}`.padEnd(4);
     const mods = `${r.modulesAffected}mod`.padEnd(5);
+    const tests = `T${testCounts.get(r.nodeId) ?? 0}`.padEnd(4);
 
-    out += `${marker} ${amp} ${flow} ${depth} ${mods} ${r.nodeId}\n`;
+    out += `${marker} ${amp} ${flow} ${depth} ${mods} ${tests} ${r.nodeId}\n`;
+
+    // Export symbols (max 5, skip if empty)
+    const node = nodeMap.get(r.nodeId);
+    const exports = node?.exports?.filter((e) => e !== "default") ?? [];
+    if (exports.length > 0) {
+      const shown = exports.slice(0, 5);
+      const suffix = exports.length > 5 ? `, +${exports.length - 5} more` : "";
+      out += `  exports: ${shown.join(", ")}${suffix}\n`;
+    }
   }
 
   const remaining = analysis.risk.length - top.length;
