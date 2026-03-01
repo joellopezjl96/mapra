@@ -47,6 +47,11 @@ export function encodeToStrandFormat(graph: StrandGraph, analysis?: GraphAnalysi
   // TEST COVERAGE — lowest signal, fine at end
   out += renderTestCoverage(graph);
 
+  // DEAD CODE — unreachable files
+  if (analysis) {
+    out += renderDeadCode(analysis);
+  }
+
   return out;
 }
 
@@ -518,6 +523,24 @@ function renderFlowsFromHubs(
     out += `${marker} ${entryStr} -> ${depStr}\n`;
   }
 
+  out += `\n`;
+  return out;
+}
+
+function renderDeadCode(analysis: GraphAnalysis): string {
+  if (!analysis.deadCode || analysis.deadCode.length === 0) return "";
+
+  const cap = 10;
+  const shown = analysis.deadCode.slice(0, cap);
+  const remaining = analysis.deadCode.length - shown.length;
+
+  let out = `─── DEAD CODE (${analysis.deadCode.length} unreachable files) ────────────────\n`;
+  for (const fileId of shown) {
+    out += `  ${fileId}\n`;
+  }
+  if (remaining > 0) {
+    out += `  +${remaining} more\n`;
+  }
   out += `\n`;
   return out;
 }

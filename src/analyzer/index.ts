@@ -5,7 +5,7 @@
  * Currently: blast radius. Designed to extend with keystones, dead wood, symbiosis.
  */
 
-import type { StrandGraph } from "../scanner/index.js";
+import type { StrandGraph, StrandNode } from "../scanner/index.js";
 import { buildReverseAdjacency } from "./graph-utils.js";
 import {
   type BlastResult,
@@ -13,7 +13,8 @@ import {
 } from "./blast-radius.js";
 
 export interface GraphAnalysis {
-  risk: BlastResult[]; // sorted by amplificationRatio desc
+  risk: BlastResult[];   // sorted by amplificationRatio desc
+  deadCode: string[];    // node IDs with zero inbound edges (likely unused)
 }
 
 /**
@@ -32,7 +33,19 @@ export function analyzeGraph(graph: StrandGraph): GraphAnalysis {
     (a, b) => b.amplificationRatio - a.amplificationRatio,
   );
 
-  return { risk };
+  // Dead code: files with no inbound edges (not routes, configs, or tests)
+  const SKIP_TYPES = new Set<StrandNode["type"]>([
+    "route", "api-route", "config", "test", "layout", "middleware",
+  ]);
+  const deadCode = graph.nodes
+    .filter(
+      (n) =>
+        !SKIP_TYPES.has(n.type) &&
+        !reverseAdj.has(n.id),
+    )
+    .map((n) => n.id);
+
+  return { risk, deadCode };
 }
 
 export type { BlastResult } from "./blast-radius.js";
