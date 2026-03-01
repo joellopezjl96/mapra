@@ -13,7 +13,7 @@ import {
 } from "./blast-radius.js";
 
 export interface GraphAnalysis {
-  risk: BlastResult[]; // sorted by weightedImpact desc
+  risk: BlastResult[]; // sorted by amplificationRatio desc
 }
 
 /**
@@ -27,9 +27,9 @@ export function analyzeGraph(graph: StrandGraph): GraphAnalysis {
   // Compute blast radii
   const blastMap = computeAllBlastRadii(reverseAdj);
 
-  // Sort by weightedImpact descending
+  // Sort by amplificationRatio descending
   const risk = [...blastMap.values()].sort(
-    (a, b) => b.weightedImpact - a.weightedImpact,
+    (a, b) => b.amplificationRatio - a.amplificationRatio,
   );
 
   return { risk };
