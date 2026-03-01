@@ -14,8 +14,17 @@ import * as path from "path";
 
 const [, , command, ...args] = process.argv;
 
-if (!command || command === "--help" || command === "-h") {
+if (command === "--help" || command === "-h") {
   printHelp();
+  process.exit(0);
+}
+
+if (!command) {
+  console.log(
+    "No command given — running setup (generate + init) in current directory.",
+  );
+  console.log("Use 'strand --help' to see all commands.\n");
+  await runSetup(undefined);
   process.exit(0);
 }
 
