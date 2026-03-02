@@ -70,6 +70,17 @@ function makeAnalysis(): GraphAnalysis {
   };
 }
 
+describe("header", () => {
+  it("includes v3 version and generation timestamp", () => {
+    const graph = makeGraph();
+    const analysis = makeAnalysis();
+    const output = encodeToStrandFormat(graph, analysis);
+
+    expect(output).toMatch(/^STRAND v3 \|/);
+    expect(output).toMatch(/\| generated \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+  });
+});
+
 describe("RISK section rendering", () => {
   it("includes export symbols for RISK entries", () => {
     const graph = makeGraph();
