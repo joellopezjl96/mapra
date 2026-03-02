@@ -1,4 +1,4 @@
-STRAND v3 | v3-polish | Typescript | 30 files | 7,509 lines | generated 2026-03-02T00:02:28
+STRAND v3 | strand | Typescript | 53 files | 8,305 lines | generated 2026-03-02T01:06:50
 LEGEND: ×N=imported by N files | █▓░·=complexity high→low | ═/·=coupling strong/weak | ×A→B=A direct, B total affected | dN=cascade depth | [AMP]=amplification≥2x | TN=N test files | NL=lines of code
 
 ─── CHURN (last 30 days, top movers) ─────────────────────
@@ -21,15 +21,16 @@ LEGEND: ×N=imported by N files | █▓░·=complexity high→low | ═/·=cou
 0.63  experiments/experiment-8-comprehension.ts             465L  7imp 
 0.61  experiments/experiment-4-strand-v2.ts                 406L  8imp 
 0.59  src/scanner/index.ts                                  615L  2imp 
-0.48  src/cli/index.ts                                      484L  2imp 
-0.34  src/encoder/encode.ts                                 364L  1imp 
+0.50  experiments/experiment-5-generalization.js            282L  8imp 
+0.49  experiments/experiment-4-strand-v2.js                 263L  8imp 
 
 ─── DOMAINS ────────────────────────────────────────
 Feature domains by file count
 
+scripts                        17 files
+experiments                    11 files
 encoder                        10 files
 analyzer                        8 files
-experiments                     5 files
 cli                             3 files
 archive                         2 files
 secrets                         1 files
@@ -39,11 +40,12 @@ unknown                         1 files
 Module complexity heatmap (█=high ▓=mid ░=low ·=minimal)
 
 █▓░·······  encoder        0.31  10 files   2,886L  
-██▓▓░·····  experiments    0.54   5 files   1,817L  
+█▓░░······  experiments    0.35  11 files   2,437L  
 ████▓▓░░··  archive        0.80   2 files     990L  
 ██▓▓░░····  scanner        0.59   1 files     615L  
 ▓·········  analyzer       0.14   8 files     612L  
 █░········  cli            0.21   3 files     581L  
+░·········  scripts        0.06  17 files     176L  
 ··········  vitest.config.ts 0.04   1 files       8L  
 
 ─── INFRASTRUCTURE ──────────────────────────────────────
@@ -51,5 +53,5 @@ Inter-module dependency roads
 
 
 ─── TEST COVERAGE ───────────────────────────────────────
-5 test files | 0/24 testable files with direct test edges (0.0%)
-─── DEAD CODE: 24 unreachable files ─────────────────
+5 test files | 0/47 testable files with direct test edges (0.0%)
+─── DEAD CODE: 47 unreachable files ─────────────────
