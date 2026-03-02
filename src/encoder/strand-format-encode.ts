@@ -22,7 +22,8 @@ export function encodeToStrandFormat(graph: StrandGraph, analysis?: GraphAnalysi
   // Header
   const generated = new Date().toISOString().slice(0, 19);
   out += `STRAND v3 | ${graph.projectName} | ${capitalize(graph.framework)} | ${graph.totalFiles} files | ${graph.totalLines.toLocaleString()} lines | generated ${generated}\n`;
-  out += `LEGEND: ×N=imported by N files | █▓░·=complexity high→low | ═/·=coupling strong/weak | ×A→B=A direct, B total affected | dN=cascade depth | [AMP]=amplification≥2x | TN=N test files | NL=lines of code\n\n`;
+  out += `LEGEND: ×N=imported by N files | █▓░·=complexity high→low | ═/·=coupling strong/weak | ×A→B=A direct, B total affected | dN=cascade depth | [AMP]=amplification≥2x | TN=N test files | NL=lines of code\n`;
+  out += `USAGE: planning→RISK,CONVENTIONS,INFRASTRUCTURE | debugging→FLOWS,CHURN,HOTSPOTS | refactoring→RISK,DOMAINS,CHURN | review→CONVENTIONS,RISK,CHURN | impact-analysis→RISK,INFRASTRUCTURE\n\n`;
 
   // RISK first — highest signal for change-impact questions
   if (analysis) {

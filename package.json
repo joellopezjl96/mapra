@@ -12,6 +12,7 @@
     "dev": "tsx",
     "scan": "tsx src/cli/scan.ts",
     "encode": "tsx src/encoder/encode.ts",
+    "batch": "tsx src/cli/index.ts batch",
     "test": "vitest run",
     "test:watch": "vitest"
   },

@@ -8,6 +8,7 @@
  *   strand init [path]     Wire .strand into project's CLAUDE.md
  *   strand status [path]   Show current strand setup state
  *   strand validate-plan <plan.md> [--since YYYY-MM-DD]  Cross-reference plan against .strand
+ *   strand batch <config.json> [--resume]  Run batch experiment from config
  */
 
 import * as fs from "fs";
@@ -53,6 +54,12 @@ switch (command) {
     await runValidatePlan(planFile, since);
     break;
   }
+  case "batch": {
+    const configFile = args.find((a) => !a.startsWith("--"));
+    const resume = args.includes("--resume");
+    await runBatchCommand(configFile, resume);
+    break;
+  }
   default:
     console.error(`Unknown command: ${command}`);
     printHelp();
@@ -75,6 +82,8 @@ Commands:
   status [path]   Show whether .strand is present, wired, and fresh
   validate-plan <plan.md> [--since YYYY-MM-DD]
                   Cross-reference plan file paths against .strand data
+  batch <config.json> [--resume]
+                  Run batch experiment comparing encoding conditions
 
   Default path: current working directory
 
@@ -83,6 +92,7 @@ Examples:
   strand setup /path/to/project     # first-time setup for a specific project
   strand update                     # refresh after code changes
   strand status                     # check current state
+  strand batch experiments/configs/strand-v3-effectiveness.json
 `);
 }
 
@@ -100,9 +110,8 @@ async function runGenerate(targetArg?: string) {
   try {
     const { scanCodebase } = await import("../scanner/index.js");
     const { analyzeGraph } = await import("../analyzer/index.js");
-    const { encodeToStrandFormat } = await import(
-      "../encoder/strand-format-encode.js"
-    );
+    const { encodeToStrandFormat } =
+      await import("../encoder/strand-format-encode.js");
 
     const outputPath = path.join(targetPath, ".strand");
 
@@ -207,7 +216,8 @@ async function runStatus(targetArg?: string) {
     const sourceMtime = newestSourceFileMtime(targetPath);
     const ageMs = Date.now() - strandMtime;
     const ageDays = Math.floor(ageMs / 86_400_000);
-    const ageStr = ageDays === 0 ? "today" : `${ageDays} day${ageDays !== 1 ? "s" : ""} ago`;
+    const ageStr =
+      ageDays === 0 ? "today" : `${ageDays} day${ageDays !== 1 ? "s" : ""} ago`;
     const stale = sourceMtime > strandMtime;
     const staleStr = stale ? " ⚠ may be stale (run 'strand update')" : "";
     console.log(`  .strand       ✓ present (updated ${ageStr})${staleStr}`);
@@ -219,7 +229,9 @@ async function runStatus(targetArg?: string) {
   } else {
     const content = fs.readFileSync(claudePath, "utf-8");
     const wired = /^@\.strand$/m.test(content);
-    console.log(`  CLAUDE.md     ${wired ? "✓ wired" : "✗ not wired (run 'strand init')"}`);
+    console.log(
+      `  CLAUDE.md     ${wired ? "✓ wired" : "✗ not wired (run 'strand init')"}`,
+    );
   }
 
   // .gitignore check
@@ -266,9 +278,11 @@ async function runValidatePlan(planArg?: string, sinceDate?: string) {
   if (sourceMtime > strandMtime) {
     const ageDays = Math.floor((Date.now() - strandMtime) / 86_400_000);
     console.warn(
-      `Warning: .strand is ${ageDays > 0 ? `${ageDays}d` : "<1d"} old and source files have changed since.`
+      `Warning: .strand is ${ageDays > 0 ? `${ageDays}d` : "<1d"} old and source files have changed since.`,
     );
-    console.warn(`Run 'strand generate' first for accurate churn and risk data.\n`);
+    console.warn(
+      `Run 'strand generate' first for accurate churn and risk data.\n`,
+    );
   }
 
   const { extractFilePaths } = await import("./plan-parser.js");
@@ -278,7 +292,9 @@ async function runValidatePlan(planArg?: string, sinceDate?: string) {
   const planContent = fs.readFileSync(planPath, "utf-8");
   const planPaths = extractFilePaths(planContent);
 
-  console.log(`Plan references ${planPaths.length} files. Validating against current codebase...\n`);
+  console.log(
+    `Plan references ${planPaths.length} files. Validating against current codebase...\n`,
+  );
 
   if (planPaths.length === 0) {
     console.log("No file paths found in plan. Nothing to validate.");
@@ -303,8 +319,17 @@ async function runValidatePlan(planArg?: string, sinceDate?: string) {
   const since = sinceDate ? new Date(sinceDate) : undefined;
 
   // Categorize plan files
-  const stale: Array<{ path: string; churn?: import("../analyzer/churn.js").ChurnResult | undefined; risk?: import("../analyzer/blast-radius.js").BlastResult | undefined }> = [];
-  const highCascade: Array<{ path: string; risk: import("../analyzer/blast-radius.js").BlastResult; node?: import("../scanner/index.js").StrandNode; tests: number }> = [];
+  const stale: Array<{
+    path: string;
+    churn?: import("../analyzer/churn.js").ChurnResult | undefined;
+    risk?: import("../analyzer/blast-radius.js").BlastResult | undefined;
+  }> = [];
+  const highCascade: Array<{
+    path: string;
+    risk: import("../analyzer/blast-radius.js").BlastResult;
+    node?: import("../scanner/index.js").StrandNode;
+    tests: number;
+  }> = [];
   const notFound: string[] = [];
 
   for (const filePath of planPaths) {
@@ -337,16 +362,24 @@ async function runValidatePlan(planArg?: string, sinceDate?: string) {
 
   // Report: STALE
   if (stale.length > 0) {
-    console.log(`STALE (modified${since ? ` since ${since.toISOString().slice(0, 10)}` : " in last 30 days"}):`);
+    console.log(
+      `STALE (modified${since ? ` since ${since.toISOString().slice(0, 10)}` : " in last 30 days"}):`,
+    );
     for (const s of stale) {
       console.log(`  ${s.path}`);
       if (s.churn) {
-        console.log(`    ${s.churn.commits30d} commits, +${s.churn.linesAdded30d} -${s.churn.linesRemoved30d} lines`);
-        console.log(`    Last: "${s.churn.lastCommitMsg}" (${s.churn.lastCommitDate.slice(0, 10)})`);
+        console.log(
+          `    ${s.churn.commits30d} commits, +${s.churn.linesAdded30d} -${s.churn.linesRemoved30d} lines`,
+        );
+        console.log(
+          `    Last: "${s.churn.lastCommitMsg}" (${s.churn.lastCommitDate.slice(0, 10)})`,
+        );
       }
       if (s.risk) {
         const amp = s.risk.amplificationRatio >= 2.0 ? "[AMP] " : "";
-        console.log(`    RISK: ${amp}amp${s.risk.amplificationRatio.toFixed(1)} ×${s.risk.directImporters}→${s.risk.affectedCount} d${s.risk.maxDepth}`);
+        console.log(
+          `    RISK: ${amp}amp${s.risk.amplificationRatio.toFixed(1)} ×${s.risk.directImporters}→${s.risk.affectedCount} d${s.risk.maxDepth}`,
+        );
       }
     }
     console.log();
@@ -357,7 +390,9 @@ async function runValidatePlan(planArg?: string, sinceDate?: string) {
     console.log("HIGH CASCADE (amplification >= 2.0):");
     for (const h of highCascade) {
       console.log(`  ${h.path}`);
-      console.log(`    RISK: [AMP] amp${h.risk.amplificationRatio.toFixed(1)} ×${h.risk.directImporters}→${h.risk.affectedCount} d${h.risk.maxDepth}`);
+      console.log(
+        `    RISK: [AMP] amp${h.risk.amplificationRatio.toFixed(1)} ×${h.risk.directImporters}→${h.risk.affectedCount} d${h.risk.maxDepth}`,
+      );
       if (h.node?.exports && h.node.exports.length > 0) {
         const shown = h.node.exports.filter((e) => e !== "default").slice(0, 5);
         if (shown.length > 0) console.log(`    exports: ${shown.join(", ")}`);
@@ -374,14 +409,27 @@ async function runValidatePlan(planArg?: string, sinceDate?: string) {
       // Check if plan adds new files of this consumer type
       const newFilesOfType = notFound.filter((p) => {
         // Rough type detection from path
-        if (conv.consumerType === "api-route" && /\/api\/.*route\.(ts|js)$/.test(p)) return true;
-        if (conv.consumerType === "route" && /\/page\.(tsx|jsx)$/.test(p)) return true;
+        if (
+          conv.consumerType === "api-route" &&
+          /\/api\/.*route\.(ts|js)$/.test(p)
+        )
+          return true;
+        if (conv.consumerType === "route" && /\/page\.(tsx|jsx)$/.test(p))
+          return true;
         return false;
       });
 
       if (newFilesOfType.length > 0) {
-        const label = conv.anchorExports.slice(0, 2).join(", ") || conv.anchorFile.split("/").pop()?.replace(/\.\w+$/, "") || "?";
-        missing.push(`Plan adds ${conv.consumerType} but may not import ${label} from ${conv.anchorFile} (${conv.adoption}/${conv.total} ${conv.consumerType}s use it)`);
+        const label =
+          conv.anchorExports.slice(0, 2).join(", ") ||
+          conv.anchorFile
+            .split("/")
+            .pop()
+            ?.replace(/\.\w+$/, "") ||
+          "?";
+        missing.push(
+          `Plan adds ${conv.consumerType} but may not import ${label} from ${conv.anchorFile} (${conv.adoption}/${conv.total} ${conv.consumerType}s use it)`,
+        );
       }
     }
 
@@ -407,7 +455,9 @@ async function runValidatePlan(planArg?: string, sinceDate?: string) {
 
   // Report: NOT FOUND (new files the plan will create)
   if (notFound.length > 0) {
-    console.log(`NEW FILES (${notFound.length} paths not in current codebase):`);
+    console.log(
+      `NEW FILES (${notFound.length} paths not in current codebase):`,
+    );
     for (const p of notFound) {
       console.log(`  ${p}`);
     }
@@ -415,7 +465,35 @@ async function runValidatePlan(planArg?: string, sinceDate?: string) {
   }
 
   // Summary
-  console.log(`SUMMARY: ${stale.length} stale, ${highCascade.length} high-cascade, ${deadRefs.length} dead-code, ${notFound.length} new files`);
+  console.log(
+    `SUMMARY: ${stale.length} stale, ${highCascade.length} high-cascade, ${deadRefs.length} dead-code, ${notFound.length} new files`,
+  );
+}
+
+async function runBatchCommand(configArg?: string, resume?: boolean) {
+  if (!configArg) {
+    console.error("Usage: strand batch <config.json> [--resume]");
+    process.exit(1);
+  }
+
+  const configPath = path.resolve(configArg);
+  if (!fs.existsSync(configPath)) {
+    console.error(`Error: config file not found: ${configPath}`);
+    process.exit(1);
+  }
+
+  if (!process.env["ANTHROPIC_API_KEY"]) {
+    console.error("Error: ANTHROPIC_API_KEY environment variable is required");
+    console.error("  Set it: ANTHROPIC_API_KEY=sk-... strand batch <config>");
+    process.exit(1);
+  }
+
+  try {
+    const { runBatch } = await import("../batch/runner.js");
+    await runBatch(configPath, { resume });
+  } catch (err) {
+    handleError("batch", err);
+  }
 }
 
 // ─── Helpers ────────────────────────────────────────────
@@ -444,7 +522,10 @@ function resolveTarget(targetArg?: string): string {
 }
 
 function handleError(command: string, err: unknown): never {
-  if (err instanceof Error && (err as NodeJS.ErrnoException).code === "EACCES") {
+  if (
+    err instanceof Error &&
+    (err as NodeJS.ErrnoException).code === "EACCES"
+  ) {
     console.error(`Error: permission denied`);
     process.exit(1);
   }
