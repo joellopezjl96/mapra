@@ -75,6 +75,16 @@ describe("applyStrandSection", () => {
     expect(content.startsWith("\n")).toBe(false);
   });
 
+  it("Edge: @.strand exists but legacy regex doesn't match — wraps instead of duplicating", () => {
+    const existing = "# Notes\n\nSome custom section with\n\n@.strand\n";
+    const { content, action } = applyStrandSection(existing);
+    expect(action).toBe("legacy-upgraded");
+    expect(content).toContain(STRAND_MARKER_START);
+    // Must not duplicate @.strand
+    const count = (content.match(/@\.strand/g) || []).length;
+    expect(count).toBe(1);
+  });
+
   it("Edge: markers always wrap CLAUDE_MD_SECTION content exactly", () => {
     const cases = [
       applyStrandSection(null), // created

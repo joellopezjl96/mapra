@@ -95,6 +95,16 @@ export function applyStrandSection(
   }
 
   // Case D: Neither markers nor @.strand — append
+  // Guard: if @.strand already exists but legacy regex didn't match,
+  // wrap it with markers in place rather than duplicating
+  if (/^@\.strand$/m.test(existingContent)) {
+    const content = existingContent.replace(
+      /^@\.strand$/m,
+      MARKED_SECTION.trimEnd(),
+    );
+    return { content, action: "legacy-upgraded" };
+  }
+
   return {
     content: existingContent.trimEnd() + "\n\n" + MARKED_SECTION,
     action: "appended",
