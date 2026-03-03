@@ -13,7 +13,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import { applyStrandSection } from "./templates.js";
+import { applyStrandSection, type StrandAction } from "./templates.js";
 
 const [, , command, ...args] = process.argv;
 
@@ -178,7 +178,7 @@ async function runInit(targetArg?: string) {
 
     fs.writeFileSync(claudePath, content, "utf-8");
 
-    const messages: Record<string, string> = {
+    const messages: Record<Exclude<StrandAction, "up-to-date">, string> = {
       created: `Created CLAUDE.md and wired @.strand`,
       upgraded: `Upgraded strand section in CLAUDE.md`,
       "legacy-upgraded": `Upgraded CLAUDE.md — added section markers for future updates`,
