@@ -13,6 +13,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
+import { applyStrandSection } from "./templates.js";
 
 const [, , command, ...args] = process.argv;
 
@@ -164,37 +165,26 @@ async function runInit(targetArg?: string) {
       process.exit(1);
     }
 
-    const section = `
----
+    const existingContent = fs.existsSync(claudePath)
+      ? fs.readFileSync(claudePath, "utf-8")
+      : null;
 
-## Codebase Map
+    const { content, action } = applyStrandSection(existingContent);
 
-Before exploring files to answer questions about structure, architecture,
-dependencies, or change impact — read the .strand encoding first. Only
-open individual files when you need implementation details the encoding
-doesn't provide.
-
-@.strand
-`;
-
-    if (!fs.existsSync(claudePath)) {
-      // Create a minimal CLAUDE.md
-      const content = `# Project Notes\n${section}`;
-      fs.writeFileSync(claudePath, content, "utf-8");
-      console.log(`Created CLAUDE.md and wired @.strand`);
+    if (action === "up-to-date") {
+      console.log(`Already up to date — CLAUDE.md has current strand section`);
       return;
     }
 
-    const existing = fs.readFileSync(claudePath, "utf-8");
+    fs.writeFileSync(claudePath, content, "utf-8");
 
-    // Idempotent: check for @.strand on its own line
-    if (/^@\.strand$/m.test(existing)) {
-      console.log(`Already wired — CLAUDE.md already references @.strand`);
-      return;
-    }
-
-    fs.writeFileSync(claudePath, existing.trimEnd() + "\n" + section, "utf-8");
-    console.log(`Wired — added @.strand reference to ${claudePath}`);
+    const messages: Record<string, string> = {
+      created: `Created CLAUDE.md and wired @.strand`,
+      upgraded: `Upgraded strand section in CLAUDE.md`,
+      "legacy-upgraded": `Upgraded CLAUDE.md — added section markers for future updates`,
+      appended: `Wired — added @.strand reference to ${claudePath}`,
+    };
+    console.log(messages[action]);
   } catch (err) {
     handleError("init", err);
   }

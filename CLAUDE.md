@@ -1,5 +1,6 @@
 # Project Notes
 
+<!-- strand:start -->
 ---
 
 ## Codebase Map
@@ -9,3 +10,4 @@ tells you which sections matter for your task type. Only open individual
 files when you need implementation details the encoding doesn't provide.
 
 @.strand
+<!-- strand:end -->
