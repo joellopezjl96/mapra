@@ -13,6 +13,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
+import { SUPERSESSION_MESSAGE, CLAUDE_MD_SECTION } from "./templates.js";
 
 const [, , command, ...args] = process.argv;
 
@@ -137,6 +138,7 @@ async function runGenerate(targetArg?: string) {
     console.log(
       `\nWrote .strand  (${encoded.length.toLocaleString()} chars  ~${tokens} tokens)`,
     );
+    console.log(SUPERSESSION_MESSAGE(new Date().toISOString().slice(0, 19)));
   } catch (err) {
     handleError("generate", err);
   }
