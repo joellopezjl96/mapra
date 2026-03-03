@@ -40,4 +40,12 @@ describe("CLAUDE_MD_SECTION", () => {
   it("contains the original trust directive", () => {
     expect(CLAUDE_MD_SECTION).toContain("ground truth");
   });
+
+  it("contains trust directive WITH the mid-session carve-out", () => {
+    // Old directive had no mention of mid-session handling.
+    // New directive keeps the trust directive but adds carve-out language.
+    expect(CLAUDE_MD_SECTION).toContain("ground truth");
+    expect(CLAUDE_MD_SECTION).toContain("strand update");
+    expect(CLAUDE_MD_SECTION).toContain("most recently read .strand");
+  });
 });

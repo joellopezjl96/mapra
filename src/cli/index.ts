@@ -166,18 +166,7 @@ async function runInit(targetArg?: string) {
       process.exit(1);
     }
 
-    const section = `
----
-
-## Codebase Map
-
-Before exploring files to answer questions about structure, architecture,
-dependencies, or change impact — read the .strand encoding first. Only
-open individual files when you need implementation details the encoding
-doesn't provide.
-
-@.strand
-`;
+    const section = CLAUDE_MD_SECTION;
 
     if (!fs.existsSync(claudePath)) {
       // Create a minimal CLAUDE.md
