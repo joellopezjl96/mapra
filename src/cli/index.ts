@@ -13,6 +13,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
+import { SUPERSESSION_MESSAGE, CLAUDE_MD_SECTION } from "./templates.js";
 
 const [, , command, ...args] = process.argv;
 
@@ -137,6 +138,7 @@ async function runGenerate(targetArg?: string) {
     console.log(
       `\nWrote .strand  (${encoded.length.toLocaleString()} chars  ~${tokens} tokens)`,
     );
+    console.log(SUPERSESSION_MESSAGE(new Date().toISOString().slice(0, 19)));
   } catch (err) {
     handleError("generate", err);
   }
@@ -164,18 +166,7 @@ async function runInit(targetArg?: string) {
       process.exit(1);
     }
 
-    const section = `
----
-
-## Codebase Map
-
-Before exploring files to answer questions about structure, architecture,
-dependencies, or change impact — read the .strand encoding first. Only
-open individual files when you need implementation details the encoding
-doesn't provide.
-
-@.strand
-`;
+    const section = CLAUDE_MD_SECTION;
 
     if (!fs.existsSync(claudePath)) {
       // Create a minimal CLAUDE.md

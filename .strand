@@ -1,20 +1,22 @@
-STRAND v3 | strand | Typescript | 53 files | 8,306 lines | generated 2026-03-02T01:34:50
+STRAND v3 | intra-session-freshness | Typescript | 38 files | 8,909 lines | generated 2026-03-03T00:37:01
 LEGEND: ×N=imported by N files | █▓░·=complexity high→low | ═/·=coupling strong/weak | ×A→B=A direct, B total affected | dN=cascade depth | [AMP]=amplification≥2x | TN=N test files | NL=lines of code
 USAGE: planning→RISK,CONVENTIONS,INFRASTRUCTURE | debugging→FLOWS,CHURN,HOTSPOTS | refactoring→RISK,DOMAINS,CHURN | review→CONVENTIONS,RISK,CHURN | impact-analysis→RISK,INFRASTRUCTURE
 
 ─── CHURN (last 30 days, top movers) ─────────────────────
-16 commits   +806 -96     src/encoder/strand-format-encode.ts  "feat(encoder): bump to v3 header with generatio..."
+17 commits   +808 -97     src/encoder/strand-format-encode.ts  "feat: add batch experiment runner for automated..."
+9 commits    +593 -38     src/cli/index.ts  "feat: update trust directive with mid-session c..."
 9 commits    +861 -14     FINDINGS.md  "results(exp8b): validation run — baked-in LEGEN..."
 7 commits    +636 -22     src/scanner/index.ts  "fix(q1): fix detectDomain() fallback + add DOMA..."
-6 commits    +487 -4      src/cli/index.ts  "feat(cli): add dead code cross-reference to val..."
+6 commits    +60 -11      package.json  "feat: add batch experiment runner for automated..."
 5 commits    +69 -9       src/analyzer/index.ts  "feat: wire convention detection into analysis p..."
-5 commits    +59 -11      package.json  "chore: add vitest test runner with blast-radius..."
 4 commits    +101 -0      src/encoder/__tests__/risk-render.test.ts  "feat(encoder): bump to v3 header with generatio..."
+3 commits    +51 -0       src/cli/__tests__/templates.test.ts  "feat: update trust directive with mid-session c..."
+3 commits    +70 -12      .strand  "feat: add batch experiment runner for automated..."
 3 commits    +2234 -554   package-lock.json  "chore: add vitest test runner with blast-radius..."
-3 commits    +13 -0       .gitignore  "chore: gitignore compiled experiment outputs an..."
 
 ─── HOTSPOTS (complexity > 0.3) ─────────────────────────
 0.87  experiments/archive/visual-vs-text.ts                 558L 12imp 
+0.79  src/batch/runner.ts                                   467L 12imp 
 0.73  experiments/archive/experiment-3-formats.ts           432L 11imp 
 0.70  src/encoder/strand-format-encode.ts                   712L  3imp 
 0.65  experiments/experiment-6-model-tiers.ts               457L  8imp 
@@ -22,17 +24,16 @@ USAGE: planning→RISK,CONVENTIONS,INFRASTRUCTURE | debugging→FLOWS,CHURN,HOTS
 0.63  experiments/experiment-8-comprehension.ts             465L  7imp 
 0.61  experiments/experiment-4-strand-v2.ts                 406L  8imp 
 0.58  src/scanner/index.ts                                  615L  2imp 
-0.50  experiments/experiment-5-generalization.js            282L  8imp 
-0.49  experiments/experiment-4-strand-v2.js                 263L  8imp 
+0.57  src/cli/index.ts                                      556L  3imp 
 
 ─── DOMAINS ────────────────────────────────────────
 Feature domains by file count
 
-scripts                        17 files
-experiments                    11 files
 encoder                        10 files
 analyzer                        8 files
-cli                             3 files
+batch                           6 files
+experiments                     5 files
+cli                             5 files
 archive                         2 files
 secrets                         1 files
 unknown                         1 files
@@ -41,12 +42,12 @@ unknown                         1 files
 Module complexity heatmap (█=high ▓=mid ░=low ·=minimal)
 
 █▓░·······  encoder        0.31  10 files   2,887L  
-█▓░░······  experiments    0.35  11 files   2,437L  
+██▓▓░·····  experiments    0.54   5 files   1,817L  
+█▓░·······  batch          0.29   6 files   1,239L  
 ████▓▓░░··  archive        0.80   2 files     990L  
+▓░········  cli            0.17   5 files     741L  
 ██▓▓░░····  scanner        0.58   1 files     615L  
 ▓·········  analyzer       0.14   8 files     612L  
-█░········  cli            0.21   3 files     581L  
-░·········  scripts        0.06  17 files     176L  
 ··········  vitest.config.ts 0.04   1 files       8L  
 
 ─── INFRASTRUCTURE ──────────────────────────────────────
@@ -54,5 +55,5 @@ Inter-module dependency roads
 
 
 ─── TEST COVERAGE ───────────────────────────────────────
-5 test files | 0/47 testable files with direct test edges (0.0%)
-─── DEAD CODE: 47 unreachable files ─────────────────
+8 test files | 0/29 testable files with direct test edges (0.0%)
+─── DEAD CODE: 29 unreachable files ─────────────────
