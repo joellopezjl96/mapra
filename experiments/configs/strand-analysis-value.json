@@ -1,0 +1,217 @@
+{
+  "name": "strand-analysis-value",
+  "description": "Isolate the value of structural analysis: text-bare (file listing only) vs text-full (with analysis) vs strand-v3. Tests whether strand's analysis data (risk, imports, complexity) adds value beyond knowing what files exist.",
+  "codebases": [{ "name": "sbc", "path": "C:\\dev\\senorburritocompany" }],
+  "conditions": [
+    {
+      "id": "none",
+      "name": "No encoding",
+      "model": "claude-sonnet-4-6",
+      "encoding": "none"
+    },
+    {
+      "id": "text-bare",
+      "name": "Text bare (file listing only)",
+      "model": "claude-sonnet-4-6",
+      "encoding": "text-bare"
+    },
+    {
+      "id": "text-full",
+      "name": "Text full (with analysis)",
+      "model": "claude-sonnet-4-6",
+      "encoding": "text"
+    },
+    {
+      "id": "strand-v3",
+      "name": "Strand v3",
+      "model": "claude-sonnet-4-6",
+      "encoding": "strand-v3",
+      "includeUsageLine": false
+    }
+  ],
+  "questions": [
+    {
+      "id": "plan-1",
+      "question": "What are the blockers for implementing a pre-order feature for Teacher Lunch Club?",
+      "taskType": "planning",
+      "assertions": [
+        {
+          "description": "Identifies ordering cutoff",
+          "check": "Response mentions the 9:00 AM ordering cutoff or time-based availability"
+        },
+        {
+          "description": "Identifies cascade risk",
+          "check": "Response mentions ordering.ts or ordering-server.ts as high-impact files"
+        },
+        {
+          "description": "Identifies payment timing",
+          "check": "Response mentions auth/capture timing or batch capture as a consideration"
+        }
+      ]
+    },
+    {
+      "id": "debug-1",
+      "question": "A teacher reports that placing an order returns a 500 error. Based on the codebase structure, what are the most likely failure points in the order submission flow?",
+      "taskType": "debugging",
+      "assertions": [
+        {
+          "description": "Identifies order route",
+          "check": "Response mentions the orders route.ts or its path"
+        },
+        {
+          "description": "Traces payment flow",
+          "check": "Response mentions authorize-net.ts or payment processing"
+        },
+        {
+          "description": "Mentions POS",
+          "check": "Response mentions Cluster POS or kitchen printer as a failure point"
+        }
+      ]
+    },
+    {
+      "id": "impact-1",
+      "question": "What would be the blast radius of changing the session management module?",
+      "taskType": "impact",
+      "assertions": [
+        {
+          "description": "Identifies session imports",
+          "check": "Response mentions session.ts is imported by 20+ files or names specific importers"
+        },
+        {
+          "description": "Identifies affected domains",
+          "check": "Response mentions at least 2 affected areas (auth, orders, profile, etc.)"
+        }
+      ]
+    },
+    {
+      "id": "impact-2",
+      "question": "If ordering.ts has a breaking API change, how many files are affected and which are most critical?",
+      "taskType": "impact",
+      "assertions": [
+        {
+          "description": "Identifies high import count",
+          "check": "Response mentions ordering.ts has ~24 importers or a high import count"
+        },
+        {
+          "description": "Identifies critical paths",
+          "check": "Response mentions the order submission route or payment flow as critical dependents"
+        }
+      ]
+    },
+    {
+      "id": "refactor-1",
+      "question": "If I rename checkOrderAvailability() in ordering.ts, what files need to change?",
+      "taskType": "refactoring",
+      "assertions": [
+        {
+          "description": "Identifies import count",
+          "check": "Response mentions ordering.ts has ~24 importers or a high import count"
+        },
+        {
+          "description": "Recommends approach",
+          "check": "Response suggests adding a new function alongside rather than renaming, OR identifies the cascade risk"
+        }
+      ]
+    },
+    {
+      "id": "refactor-2",
+      "question": "The kitchen admin tools (prep sheet, packing slips, driver manifest) share similar patterns. Suggest how to refactor them to reduce duplication.",
+      "taskType": "refactoring",
+      "assertions": [
+        {
+          "description": "Identifies kitchen modules",
+          "check": "Response mentions kitchen directory or kitchen-specific files"
+        },
+        {
+          "description": "Identifies shared patterns",
+          "check": "Response mentions shared queries, date utilities, or thermal print styles"
+        }
+      ]
+    },
+    {
+      "id": "review-1",
+      "question": "A new API route at /api/teacher-club/preorders/route.ts is being added. Based on existing patterns, what should it import?",
+      "taskType": "review",
+      "assertions": [
+        {
+          "description": "Mentions session",
+          "check": "Response mentions session.ts or authentication"
+        },
+        {
+          "description": "Mentions rate limiting",
+          "check": "Response mentions rate-limit.ts"
+        },
+        {
+          "description": "Mentions prisma",
+          "check": "Response mentions prisma.ts or database access"
+        }
+      ]
+    },
+    {
+      "id": "arch-1",
+      "question": "Describe the overall architecture of the Teacher Lunch Club subsystem. What are the major modules and how do they connect?",
+      "taskType": "architecture",
+      "assertions": [
+        {
+          "description": "Identifies auth module",
+          "check": "Response mentions the auth/session layer"
+        },
+        {
+          "description": "Identifies payment module",
+          "check": "Response mentions authorize-net or payment processing"
+        },
+        {
+          "description": "Identifies POS integration",
+          "check": "Response mentions Cluster POS integration"
+        },
+        {
+          "description": "Identifies clean boundary",
+          "check": "Response mentions TLC isolation or that it's designed for future separation"
+        }
+      ]
+    },
+    {
+      "id": "inv-1",
+      "question": "List all API routes that handle POST requests related to teacher authentication.",
+      "taskType": "inventory",
+      "assertions": [
+        {
+          "description": "Lists register",
+          "check": "Response mentions the register route"
+        },
+        {
+          "description": "Lists magic-link",
+          "check": "Response mentions the magic-link route"
+        },
+        {
+          "description": "Lists verify",
+          "check": "Response mentions the verify or verify-magic-link route"
+        }
+      ]
+    },
+    {
+      "id": "inv-2",
+      "question": "What are the highest-complexity files in the codebase?",
+      "taskType": "inventory",
+      "assertions": [
+        {
+          "description": "Identifies orders route",
+          "check": "Response mentions the teacher-club orders route as high complexity"
+        },
+        {
+          "description": "Identifies register route",
+          "check": "Response mentions the register route as high complexity"
+        },
+        {
+          "description": "Uses quantitative data",
+          "check": "Response cites line counts or complexity scores rather than just guessing"
+        }
+      ]
+    }
+  ],
+  "trials": 3,
+  "maxTokens": 1024,
+  "delayMs": 600,
+  "judgeModel": "claude-haiku-4-5-20251001",
+  "outputDir": "experiments/output"
+}
