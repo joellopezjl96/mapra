@@ -40,7 +40,16 @@ switch (command) {
     await runGenerate(args[0]);
     break;
   case "update":
-    await runGenerate(args[0] ?? process.cwd());
+    try {
+      await runGenerate(args[0] ?? process.cwd(), true);
+    } catch (err) {
+      console.error(
+        `strand update failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      console.error(
+        "Continuing with stale .strand. Complete your refactor and retry.",
+      );
+    }
     break;
   case "init":
     await runInit(args[0]);
@@ -106,7 +115,7 @@ async function runSetup(targetArg?: string) {
   console.log("\nDone. Open Claude Code and ask about your codebase.");
 }
 
-async function runGenerate(targetArg?: string) {
+async function runGenerate(targetArg?: string, softFail = false) {
   const targetPath = resolveTarget(targetArg);
 
   try {
@@ -152,6 +161,7 @@ async function runGenerate(targetArg?: string) {
     );
     console.log(SUPERSESSION_MESSAGE(timestamp));
   } catch (err) {
+    if (softFail) throw err;
     handleError("generate", err);
   }
 }
