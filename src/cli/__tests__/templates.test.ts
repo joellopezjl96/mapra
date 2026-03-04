@@ -25,6 +25,13 @@ describe("applyStrandSection", () => {
     expect(content).toBe(existing);
   });
 
+  it("section content includes freshness carve-out", () => {
+    expect(CLAUDE_MD_SECTION).toContain(
+      "always prefer the\nmost recently read version",
+    );
+    expect(CLAUDE_MD_SECTION).toContain("generated");
+  });
+
   it("Case B2: markers present with different content replaces section", () => {
     const oldSection = `${STRAND_MARKER_START}\nold content\n${STRAND_MARKER_END}\n`;
     const existing = `# My Project\n\n${oldSection}`;
