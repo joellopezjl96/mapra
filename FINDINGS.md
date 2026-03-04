@@ -845,3 +845,250 @@ LEGEND line added to `src/encoder/strand-format-encode.ts` (line 2 of every `.st
 3. **Q8 remains the ceiling.** Still PARTIAL across all trials — the cross-section synthesis problem (import count ≠ cascade risk) is not solved by the LEGEND. Expected; the LEGEND describes notation, not the reasoning distinction.
 
 4. **Format is stable.** Tier A at 100%, Tier B at 87.5%. The LEGEND is now a permanent part of `.strand` v2.
+
+---
+
+## Experiment 9: Batch Runner — Strand v3 Effectiveness (Confounded)
+
+**Date:** 2026-03-02
+**File:** `src/batch/runner.ts` (new batch experiment infrastructure)
+**Config:** `experiments/configs/strand-v3-effectiveness.json`
+**Results:** `experiments/output/strand-v3-effectiveness-results.json`
+**Report:** `experiments/output/strand-v3-effectiveness-summary.md`
+
+### Methodology Change
+
+This is the first experiment using the new **batch experiment runner** — a config-driven system that orchestrates multiple conditions × questions × trials automatically with LLM-as-judge scoring. Previous experiments (1-8b) ran one data point at a time.
+
+- **Scale:** 4 conditions × 15 questions × 3 trials = 180 trial calls + 180 judge calls = 360 API calls
+- **Judge:** claude-haiku-4-5-20251001 evaluates each response against predefined assertions (PASS/PARTIAL/FAIL)
+- **Questions:** 15 across 7 task types (planning, debugging, impact, inventory, refactoring, review, architecture)
+- **Cost:** ~$3.74
+
+### Conditions
+
+| # | Condition | Encoding | Tokens (avg) |
+|---|-----------|----------|-------------|
+| 1 | No encoding | none | 29 |
+| 2 | Text only | text | 3,105 |
+| 3 | Strand v3 | strand-v3 | 4,586 |
+| 4 | Strand v3 + USAGE | strand-v3 + USAGE line | 4,650 |
+
+### Overall Scores
+
+| Condition | Avg Score |
+|-----------|-----------|
+| No encoding | 0.11 |
+| Text only | **0.71** |
+| Strand v3 | **0.70** |
+| Strand v3 + USAGE | 0.68 |
+
+### Scores by Task Type
+
+| Task Type | No encoding | Text only | Strand v3 | Strand v3 + USAGE |
+|-----------|-----------|-----------|-----------|-----------|
+| architecture | 0.00 | 0.44 | **0.68** | 0.61 |
+| debugging | 0.06 | 0.44 | **0.47** | 0.44 |
+| impact | 0.17 | **1.00** | **1.00** | **1.00** |
+| inventory | 0.06 | 0.97 | **1.00** | **1.00** |
+| planning | 0.07 | **0.72** | 0.67 | 0.57 |
+| refactoring | 0.17 | **0.88** | 0.58 | 0.67 |
+| review | 0.25 | **0.50** | **0.50** | **0.50** |
+
+### Key Findings
+
+1. **Text ≈ Strand overall (0.71 vs 0.70).** At first glance, this appears to show that strand's compact format adds no value over verbose text.
+
+2. **Strand wins on architecture (+24 points).** Strand's topology encoding (import counts, module boundaries, amplification) enables better architectural reasoning.
+
+3. **Text crushes strand on refactoring (+30 points).** Text's verbose format includes file descriptions and utility names (thermal-print-styles.ts, dates.ts) that strand filters out, helping with pattern recognition in refactoring tasks.
+
+4. **USAGE line hurts slightly (-0.02 overall).** The USAGE routing line adds noise without helping. This confirms experiment 7's finding that the USAGE line doesn't add meaningful value.
+
+### Critical Flaw Discovered
+
+**This experiment was confounded.** The "text" encoding was built using `encodeToText(graph, analysis)` — which includes strand's structural analysis data:
+- Risk / blast radius rankings (from strand's analyzer)
+- Complexity hotspots with scores (from strand's analyzer)
+- Most Depended-On Files with import counts (from strand's analyzer)
+- Test coverage statistics (from strand's analyzer)
+
+Text was getting strand's analysis for free, making the comparison unfair. Text 0.71 vs Strand 0.70 doesn't mean "strand adds no value" — it means "text with strand's analysis ≈ strand with strand's analysis." The encoding format is roughly equivalent when both have the same underlying data.
+
+**This led directly to Experiment 10.**
+
+---
+
+## Experiment 10: Strand Analysis Value (Proper Control)
+
+**Date:** 2026-03-02
+**Config:** `experiments/configs/strand-analysis-value.json`
+**Results:** `experiments/output/strand-analysis-value-results.json`
+**Report:** `experiments/output/strand-analysis-value-summary.md`
+
+### Hypothesis
+
+Strand's structural analysis (risk, import counts, complexity) is the primary value-add, not just the encoding format. To test this, we need a proper control: text with NO strand analysis data (file listing only).
+
+### Setup
+
+Added `text-bare` encoding mode to the encoder — strips Risk, Complexity Hotspots, Most Depended-On Files, and Test Coverage sections. Keeps only file listing: Modules, API Routes, Pages, Components (sorted alphabetically, no complexity scores), Schema.
+
+- **Scale:** 4 conditions × 10 questions × 3 trials = 120 trial calls + 120 judge calls = 240 API calls
+- **Cost:** ~$2.09
+- **Questions:** 10 across 7 task types (planning, debugging, impact×2, refactoring×2, review, architecture, inventory×2)
+
+### Conditions
+
+| # | Condition | Encoding | What's Included | Tokens (avg) |
+|---|-----------|----------|-----------------|-------------|
+| 1 | No encoding | none | Nothing | 29 |
+| 2 | Text bare | text-bare | File listing only (modules, routes, pages, components, schema) | 2,318 |
+| 3 | Text full | text | File listing + strand's structural analysis | 3,128 |
+| 4 | Strand v3 | strand-v3 | Compact notation with structural analysis | 4,601 |
+
+### Overall Scores
+
+| Condition | Avg Score | Δ from previous |
+|-----------|-----------|-----------------|
+| No encoding | 0.13 | baseline |
+| Text bare | 0.50 | **+0.37** (file listing) |
+| Text full | 0.75 | **+0.25** (structural analysis) |
+| Strand v3 | **0.82** | **+0.07** (compact format) |
+
+### Value Attribution
+
+The gradient reveals where value comes from:
+
+| Layer | Δ Score | What It Adds |
+|-------|---------|-------------|
+| File listing (bare→none) | **+0.37** | Knowing what files exist, their sizes, how they're organized |
+| Structural analysis (full→bare) | **+0.25** | Risk rankings, import counts, complexity scores, test coverage |
+| Strand format (strand→full) | **+0.07** | Compact notation, amplification ratios, cascade depth, module coupling |
+
+### Scores by Task Type
+
+| Task Type | No encoding | Text bare | Text full | Strand v3 |
+|-----------|-----------|-----------|-----------|-----------|
+| architecture | 0.00 | 0.42 | 0.33 | **0.58** |
+| debugging | 0.00 | 0.33 | 0.33 | **0.67** |
+| impact | 0.08 | 0.58 | **1.00** | **1.00** |
+| inventory | 0.11 | 0.78 | 0.89 | **1.00** |
+| planning | 0.00 | 0.00 | 0.44 | **0.50** |
+| refactoring | 0.21 | 0.42 | **0.79** | 0.75 |
+| review | 0.50 | 0.67 | **1.00** | **1.00** |
+
+### Key Findings
+
+1. **Strand v3 wins decisively (0.82).** With a proper control (text-bare), strand v3 is clearly the best encoding. The confounded Experiment 9 masked this.
+
+2. **File listing alone is valuable (+0.37).** Just knowing what files exist and how they're organized gives the LLM a massive boost over no context. This is the single biggest jump.
+
+3. **Structural analysis is the second-biggest value-add (+0.25).** Risk rankings, import counts, and complexity scores enable the LLM to reason about impact, dependencies, and critical paths. This is strand's core contribution.
+
+4. **Strand's compact format adds a smaller but real boost (+0.07).** The notation itself (amplification ratios, cascade depth, module coupling roads) helps beyond what verbose text with the same data achieves.
+
+5. **Strand wins or ties on 6 of 7 task types.** The only exception is refactoring (0.75 vs 0.79), where text-full's verbose file descriptions help identify shared patterns. The gap is small (4 points).
+
+6. **Strand dominates architecture and debugging.** These are the task types where topology awareness matters most — strand's amplification ratios and cascade metadata directly answer "what happens if I change this?" questions.
+
+7. **Planning requires deep analysis.** Both no-encoding (0.00) and text-bare (0.00) completely fail at planning — you can't plan pre-order features without understanding ordering cutoffs, payment timing, and cascade risks. Only text-full (0.44) and strand (0.50) score at all.
+
+### Implications for Strand
+
+- **The analysis is the product.** Strand's value isn't primarily the encoding format — it's the structural analysis (risk, imports, complexity) that the encoder surfaces. A verbose text format with the same analysis data gets 0.75 vs strand's 0.82.
+- **The format does matter, but less than the analysis.** Strand's compact notation adds +0.07 over verbose text with identical data. This is real but secondary.
+- **File listing is table stakes.** Any encoding that doesn't at least list files with sizes is leaving 0.37 points on the table.
+- **Refactoring is strand's weakest task type.** Strand's topology-first encoding strips semantic details (what utility files do, what patterns they share) that help with refactoring. Future format work could address this.
+
+---
+
+## Experiment 11: Section Ablation
+
+**Date:** 2026-03-04
+**Config:** `experiments/configs/section-ablation.json`
+**Results:** `experiments/output/section-ablation-results.json`
+**Report:** `experiments/output/section-ablation-summary.md`
+
+### Hypothesis
+
+Individual sections in .strand v3 contribute differently to LLM task performance. Removing one section at a time reveals each section's marginal value and identifies sections that can be trimmed to save tokens.
+
+### Setup
+
+- **Scale:** 6 conditions × 15 questions × 2-3 trials = 240 trial calls + 240 judge calls = 480 API calls
+- **Cost:** ~$6.02
+- **Questions:** 15 across 7 task types (3 planning, 2 debugging, 2 impact, 2 refactoring, 2 review, 2 inventory, 2 architecture)
+- **Codebase:** SenorBurritoCompany (298 files, 52,872 lines)
+
+### Conditions
+
+| # | Condition | Encoding | Tokens (avg) |
+|---|-----------|----------|-------------|
+| 1 | Full v3 (baseline) | strand-v3, all sections | 4,663 |
+| 2 | No PAGES | strand-v3, PAGES removed | 4,081 |
+| 3 | No DOMAINS | strand-v3, DOMAINS removed | 4,456 |
+| 4 | No TERRAIN | strand-v3, TERRAIN removed | 4,020 |
+| 5 | No HOTSPOTS | strand-v3, HOTSPOTS removed | 4,378 |
+| 6 | No RISK | strand-v3, RISK removed | 4,150 |
+
+### Overall Scores
+
+| Condition | Avg Score | Δ vs Baseline |
+|-----------|-----------|---------------|
+| Full v3 (baseline) | 0.71 | — |
+| No PAGES | **0.75** | +0.04 |
+| No DOMAINS | **0.74** | +0.03 |
+| No TERRAIN | **0.75** | +0.04 |
+| No HOTSPOTS | 0.71 | 0.00 |
+| No RISK | 0.72 | +0.01 |
+
+### Scores by Task Type
+
+| Task Type | Baseline | No PAGES | No DOMAINS | No TERRAIN | No HOTSPOTS | No RISK |
+|-----------|----------|----------|------------|------------|-------------|---------|
+| architecture | 0.63 | 0.63 | 0.59 | 0.66 | 0.62 | **0.49** |
+| debugging | 0.54 | 0.61 | 0.53 | 0.58 | 0.50 | 0.63 |
+| impact | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
+| inventory | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
+| planning | 0.67 | 0.72 | 0.74 | 0.72 | 0.69 | 0.72 |
+| refactoring | 0.69 | 0.75 | **0.83** | 0.79 | 0.71 | 0.69 |
+| review | 0.50 | 0.58 | 0.50 | 0.50 | 0.50 | 0.50 |
+
+### Key Findings
+
+1. **No section removal hurts overall performance.** Every ablation scored equal to or higher than the full baseline (0.71). This means no single section is load-bearing across all task types — the model compensates using data from other sections.
+
+2. **RISK is the only section with a detectable task-specific signal.** Removing RISK drops architecture scores from 0.63 → 0.49 (-14 points). On arch-2 (external integrations), no-risk scored 0.42 vs baseline 0.75 — the model lost its ability to identify Cluster POS without the RISK section's blast radius data. This is the one clear regression in the experiment.
+
+3. **PAGES, DOMAINS, and TERRAIN are noise for these questions.** Removing any of them *improved* scores by +0.03-0.04. The model likely performs slightly better with less context to sift through. PAGES saved 582 tokens, TERRAIN saved 643 tokens — meaningful overhead with no benefit.
+
+4. **HOTSPOTS is perfectly neutral.** Identical score to baseline (0.71). The HOTSPOTS data overlaps heavily with API ROUTES (both show the same files with complexity scores), making it redundant for these question types.
+
+5. **Impact and inventory hit the ceiling.** All 6 conditions scored 1.00 on both task types — the questions are too easy to differentiate. These questions test data that appears in MOST IMPORTED, API ROUTES, and CHURN, none of which were ablated.
+
+6. **Removing DOMAINS boosted refactoring by +14 points (0.69 → 0.83).** This is counterintuitive — fewer sections improved the model's ability to identify shared patterns in kitchen tools. The DOMAINS section may add distracting noise for pattern-matching tasks.
+
+7. **Review is universally weak (0.50 across all conditions).** The review-2 question (email template migration risks) scored 0.00 for ALL conditions including baseline — no condition mentioned TlcEmailLayout or the clean boundary rule. This is a question design issue, not a section issue.
+
+### Limitations
+
+This experiment has a known sensitivity gap. The pre-experiment review identified that most questions' assertions don't directly test data unique to each ablated section:
+
+- **PAGES:** 0/15 questions have assertions dependent on PAGES data
+- **DOMAINS:** 0-2 questions have marginal sensitivity
+- **TERRAIN:** 1 question has weak sensitivity
+- **HOTSPOTS:** 2 questions, but redundant with API ROUTES data
+- **RISK:** 3-5 questions with genuine sensitivity
+
+The null results for PAGES, DOMAINS, and TERRAIN should be interpreted as "these sections don't help on these question types" — NOT as "these sections have no value." A follow-up experiment with section-targeted questions (e.g., "Which module has the highest average complexity?" for TERRAIN) would be needed to measure direct value.
+
+High-value sections not ablated — FLOWS (5 questions depend on it), MOST IMPORTED (3 questions), API ROUTES (4 questions), and CONVENTIONS (2 questions) — would likely show stronger signal if tested.
+
+### Implications
+
+- **PAGES and TERRAIN are trim candidates.** They cost 582 and 643 tokens respectively with no measurable benefit and slight negative signal (scores improved when removed). Consider making them opt-in or conditional on the USAGE line task type.
+- **RISK earns its place for architecture tasks.** The -14 point regression on architecture confirms RISK carries unique signal that no other section provides. Keep it.
+- **HOTSPOTS is redundant with API ROUTES.** Consider merging them or dropping HOTSPOTS. The same files appear in both with the same complexity scores.
+- **DOMAINS provides no measurable value.** 207 tokens saved, +0.03 score improvement when removed. Candidate for trimming.
+- **Future ablation should test FLOWS and MOST IMPORTED.** These sections are referenced by the most questions and would produce the most actionable results.

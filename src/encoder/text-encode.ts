@@ -7,7 +7,17 @@
 import type { StrandGraph } from "../scanner/index.js";
 import type { GraphAnalysis } from "../analyzer/index.js";
 
-export function encodeToText(graph: StrandGraph, analysis?: GraphAnalysis): string {
+export interface TextEncodeOptions {
+  /** Strip structural analysis (Risk, Complexity, Most Imported, Test Coverage) */
+  bare?: boolean;
+}
+
+export function encodeToText(
+  graph: StrandGraph,
+  analysis?: GraphAnalysis,
+  options?: TextEncodeOptions,
+): string {
+  const bare = options?.bare ?? false;
   let text = "";
 
   // Layer 0: Identity
@@ -25,8 +35,8 @@ export function encodeToText(graph: StrandGraph, analysis?: GraphAnalysis): stri
     text += `\n`;
   }
 
-  // Risk analysis
-  if (analysis && analysis.risk.length > 0) {
+  // Risk analysis (structural — skip in bare mode)
+  if (!bare && analysis && analysis.risk.length > 0) {
     text += `\n## Risk (Change With Care)\n`;
     const top = analysis.risk.slice(0, 8);
     for (const r of top) {
@@ -75,10 +85,15 @@ export function encodeToText(graph: StrandGraph, analysis?: GraphAnalysis): stri
   const components = graph.nodes.filter((n) => n.type === "component");
   if (components.length > 0) {
     text += `\n## Components (${components.length})\n`;
-    for (const comp of components
-      .sort((a, b) => b.complexity - a.complexity)
-      .slice(0, 20)) {
-      text += `- ${comp.name} (${comp.lines} lines, complexity: ${comp.complexity.toFixed(2)})\n`;
+    const sorted = bare
+      ? [...components].sort((a, b) => a.name.localeCompare(b.name))
+      : [...components].sort((a, b) => b.complexity - a.complexity);
+    for (const comp of sorted.slice(0, 20)) {
+      if (bare) {
+        text += `- ${comp.name} (${comp.lines} lines)\n`;
+      } else {
+        text += `- ${comp.name} (${comp.lines} lines, complexity: ${comp.complexity.toFixed(2)})\n`;
+      }
     }
     if (components.length > 20) {
       text += `  ... and ${components.length - 20} more\n`;
@@ -96,46 +111,49 @@ export function encodeToText(graph: StrandGraph, analysis?: GraphAnalysis): stri
     }
   }
 
-  // High-complexity files
-  const complex = graph.nodes
-    .filter((n) => n.type !== "test" && n.type !== "config")
-    .sort((a, b) => b.complexity - a.complexity)
-    .slice(0, 10);
+  // Structural analysis sections — skip in bare mode
+  if (!bare) {
+    // High-complexity files
+    const complex = graph.nodes
+      .filter((n) => n.type !== "test" && n.type !== "config")
+      .sort((a, b) => b.complexity - a.complexity)
+      .slice(0, 10);
 
-  text += `\n## Complexity Hotspots (top 10)\n`;
-  for (const node of complex) {
-    text += `- ${node.path} (${node.lines} lines, ${node.imports.length} imports)\n`;
-  }
-
-  // Dependencies — most connected files
-  const edgeCounts = new Map<string, number>();
-  for (const edge of graph.edges) {
-    edgeCounts.set(edge.to, (edgeCounts.get(edge.to) || 0) + 1);
-  }
-  const mostImported = [...edgeCounts.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10);
-
-  if (mostImported.length > 0) {
-    text += `\n## Most Depended-On Files\n`;
-    for (const [fileId, count] of mostImported) {
-      text += `- ${fileId} (imported by ${count} files)\n`;
+    text += `\n## Complexity Hotspots (top 10)\n`;
+    for (const node of complex) {
+      text += `- ${node.path} (${node.lines} lines, ${node.imports.length} imports)\n`;
     }
+
+    // Dependencies — most connected files
+    const edgeCounts = new Map<string, number>();
+    for (const edge of graph.edges) {
+      edgeCounts.set(edge.to, (edgeCounts.get(edge.to) || 0) + 1);
+    }
+    const mostImported = [...edgeCounts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10);
+
+    if (mostImported.length > 0) {
+      text += `\n## Most Depended-On Files\n`;
+      for (const [fileId, count] of mostImported) {
+        text += `- ${fileId} (imported by ${count} files)\n`;
+      }
+    }
+
+    // Test coverage
+    const testEdges = graph.edges.filter((e) => e.type === "tests");
+    const testedFiles = new Set(testEdges.map((e) => e.to));
+    const testableFiles = graph.nodes.filter(
+      (n) => n.type !== "test" && n.type !== "config",
+    );
+    const coveragePercent =
+      testableFiles.length > 0
+        ? ((testedFiles.size / testableFiles.length) * 100).toFixed(0)
+        : "0";
+
+    text += `\n## Test Coverage\n`;
+    text += `${testEdges.length} test files covering ${testedFiles.size}/${testableFiles.length} files (${coveragePercent}%)\n`;
   }
-
-  // Test coverage
-  const testEdges = graph.edges.filter((e) => e.type === "tests");
-  const testedFiles = new Set(testEdges.map((e) => e.to));
-  const testableFiles = graph.nodes.filter(
-    (n) => n.type !== "test" && n.type !== "config",
-  );
-  const coveragePercent =
-    testableFiles.length > 0
-      ? ((testedFiles.size / testableFiles.length) * 100).toFixed(0)
-      : "0";
-
-  text += `\n## Test Coverage\n`;
-  text += `${testEdges.length} test files covering ${testedFiles.size}/${testableFiles.length} files (${coveragePercent}%)\n`;
 
   return text;
 }

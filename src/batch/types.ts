@@ -16,7 +16,7 @@ export interface Condition {
   id: string;
   name: string;
   model: string;
-  encoding: "strand-v3" | "strand-v2" | "text" | "none";
+  encoding: "strand-v3" | "strand-v2" | "text" | "text-bare" | "none";
   includeUsageLine?: boolean;
   excludeSections?: string[];
   trials?: number;

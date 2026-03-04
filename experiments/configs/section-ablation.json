@@ -54,6 +54,15 @@
       "includeUsageLine": true,
       "excludeSections": ["RISK"]
     },
+    {
+      "id": "no-dead-code",
+      "name": "No DEAD CODE",
+      "model": "claude-sonnet-4-6",
+      "encoding": "strand-v3",
+      "includeUsageLine": true,
+      "excludeSections": ["DEAD CODE"],
+      "trials": 3
+    }
   ],
   "questions": [
     {

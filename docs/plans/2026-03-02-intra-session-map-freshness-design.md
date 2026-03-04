@@ -1,7 +1,8 @@
 # Intra-Session Map Freshness Design
 
 **Date:** 2026-03-02
-**Status:** Draft
+**Updated:** 2026-03-03 (post-review)
+**Status:** Draft → Revised
 **Theme:** Keep .strand valid during active implementation, not just between sessions
 
 ---
@@ -31,19 +32,20 @@ explicitly tells the agent to favor `.strand`.
 
 **1. Phantom blast radius**
 Agent refactors `auth.ts` in step 3, reducing blast radius from 23 → 8. In step 7,
-agent runs `strand impact auth.ts`. Output: "23 total affected." Agent adds unnecessary
-defensive complexity to protect against a risk it already eliminated. v4's trust directive
-makes this worse — the agent follows the output rather than questioning it.
+the agent consults `.strand` RISK data and sees "×23 total affected." Agent adds unnecessary
+defensive complexity to protect against a risk it already eliminated. The trust directive
+makes this worse — the agent follows the data rather than questioning it.
 
 **2. New files invisible to the manifest**
 The hash manifest (v4) tracks mtimes of files that existed at generation time. New files
 created during a session are not in the manifest. The freshness stamp shows "0 files
 modified since" even as new modules with significant blast radius are created mid-session.
 
-**3. `strand impact` reads stale graph**
-The v4 design explicitly states: "Reads from `.strand` data — no re-scan, instant output."
-Running `strand impact` after mid-session architectural changes returns cascade data from
-the session-start snapshot.
+**3. `strand impact` will read stale graph (v4 — not yet implemented)**
+The v4 toolbelt design proposes a `strand impact` command that reads from `.strand` data
+with no re-scan. Once implemented, running `strand impact` after mid-session architectural
+changes would return cascade data from the session-start snapshot. This failure mode does
+not exist today but the checkpoint convention positions us correctly for when it ships.
 
 **4. Two competing .strand versions in context**
 If the agent does regenerate mid-session and reads the new file, the original `.strand`
@@ -68,7 +70,8 @@ Implementation plans include explicit `strand update` steps at architectural bou
 mid-session carve-out.
 
 - **Pro:** Predictable, explicit, no new infrastructure, works with current tooling
-- **Con:** Requires plan authors to insert checkpoints deliberately
+- **Con:** Requires plan authors to insert checkpoints deliberately. Silent failure when
+  omitted (mitigated by `validate-plan --checkpoints` — see Section 7).
 
 ### C — Commit-frequency enforcement
 Solve by requiring frequent small commits. The pre-commit hook already handles regeneration.
@@ -77,8 +80,8 @@ Solve by requiring frequent small commits. The pre-commit hook already handles r
 - **Con:** Changes developer workflow. Does not help sessions that span uncommitted work.
   Does not solve the "two versions in context" problem.
 
-**Decision: B.** Explicit checkpoints are the right primitive. The plan is the natural
-place to encode "this step changes the architecture, refresh the map before continuing."
+**Decision: B + enforcement tooling.** Explicit checkpoints are the right primitive,
+but must be paired with automated validation to prevent silent drift from missing tags.
 
 ---
 
@@ -96,8 +99,14 @@ This gives the agent a clear, unambiguous signal that any `.strand` content load
 in the conversation is now stale. The agent reads this in conversation context and knows
 to prefer the freshly read file.
 
-**Implementation:** One `console.log` line added to `runGenerate()` in `src/cli/index.ts`
-after the file is written. No other changes.
+**Implementation:** Add a `SUPERSESSION_MESSAGE` function to the existing
+`src/cli/templates.ts` (alongside `CLAUDE_MD_SECTION`). Add one `console.log` call in
+`runGenerate()` in `src/cli/index.ts` after the file write (line ~141). No other changes.
+
+**Atomic write:** `runGenerate()` must write to `.strand.tmp` then `fs.renameSync()` to
+`.strand`. This prevents concurrent readers (subagents, editors) from seeing a truncated
+file mid-write. On Windows, `renameSync` over an existing file can fail if another process
+holds a read handle — wrap in a retry with 100ms backoff (max 3 attempts).
 
 ### 2. Plan checkpoint convention
 
@@ -113,7 +122,8 @@ Split `src/auth.ts` into `src/auth-core.ts` and `src/auth-utils.ts`.
 Move token handling to `auth-utils.ts`.
 
 ### Step 4: Refresh map [CHECKPOINT]
-Run `strand update` then read the new `.strand`.
+Run `strand update` in the project root.
+Then use the Read tool (or `cat .strand`) to load the full contents into context.
 The fresh map supersedes the session-start version.
 Verify blast radius for `auth-core.ts` before continuing.
 
@@ -122,6 +132,14 @@ Verify blast radius for `auth-core.ts` before continuing.
 ```
 
 The `[CHECKPOINT]` tag is a visual marker for both the agent and the plan author.
+
+**Concrete read instruction:** The checkpoint step must use the **Read tool** or
+`cat .strand` to load file contents into conversation context. The `@.strand` directive
+in CLAUDE.md is resolved only at session start and cannot be re-triggered mid-session.
+
+**Disambiguation:** When multiple `.strand` versions exist in context, the agent should
+compare the `generated` timestamp in the STRAND header line (e.g.,
+`generated 2026-03-02T14:22:10`) and always prefer the one with the latest timestamp.
 
 **When a checkpoint is required:**
 - Any step that creates a new file that will be imported by multiple modules
@@ -137,32 +155,115 @@ The `[CHECKPOINT]` tag is a visual marker for both the agent and the plan author
 
 ### 3. Trust directive update
 
-The current CLAUDE.md trust directive:
+The current CLAUDE.md section (in `src/cli/templates.ts` `CLAUDE_MD_SECTION`) says:
 
-> Treat .strand data as ground truth for structural facts (blast radius, complexity,
-> import counts, test coverage).
+> Before exploring files for any task — read .strand first. The USAGE line
+> tells you which sections matter for your task type. Only open individual
+> files when you need implementation details the encoding doesn't provide.
 
-Updated:
+Updated `CLAUDE_MD_SECTION` adds a freshness carve-out:
 
-> Treat .strand data as ground truth for structural facts (blast radius, complexity,
-> import counts, test coverage). If you have run `strand update` during this session
-> and read the new file, that version supersedes the session-start version. Prefer
-> the most recently read .strand in all decisions.
+> Before exploring files for any task — read .strand first. The USAGE line
+> tells you which sections matter for your task type. Only open individual
+> files when you need implementation details the encoding doesn't provide.
+>
+> If .strand has been regenerated during this session, always prefer the
+> most recently read version. Compare the `generated` timestamp in the
+> header line to identify which is newest.
 
-This gives the agent explicit permission to override the session-start `.strand` when
-a fresh version is available — without undermining the general trust directive.
+This is a simpler formulation than "if you have run `strand update`" — it does not
+require the agent to track self-referential state. It just says: prefer the latest.
 
-### 4. writing-plans convention update
+**Implementation:** Edit the existing `CLAUDE_MD_SECTION` constant in
+`src/cli/templates.ts`. Since `runInit()` already delegates to `applyStrandSection()`
+which uses this constant, the change propagates automatically. The section-marker
+infrastructure (`STRAND_MARKER_START`, `STRAND_MARKER_END`, `applyStrandSection()`)
+is preserved untouched. Existing users running `strand init` will get an "upgraded"
+action when the content between markers differs.
 
-The `writing-plans` skill (or plan template) should include a reminder:
+### 4. Project-local checkpoint convention
 
-> For steps that restructure architecture (file creation, deletion, module moves),
-> add a `[CHECKPOINT]` step immediately after: run `strand update`, read the new
-> `.strand`, then continue. The checkpoint ensures the map reflects the current
-> architecture before consequential decisions.
+The `writing-plans` skill is a third-party plugin (`superpowers`) that will be
+overwritten on updates. Instead, add the checkpoint convention to **CLAUDE.md** itself
+so it persists with the project:
 
-This makes checkpoints the default for plan authors rather than something they have
-to remember.
+Add to `CLAUDE_MD_SECTION` (or as a separate project convention in CLAUDE.md):
+
+> For implementation plans that restructure architecture (file creation, deletion,
+> module boundary changes), add a `[CHECKPOINT]` step after: run `strand update`,
+> read the new `.strand`, then continue.
+
+This makes the checkpoint convention part of the project's own instructions, not
+dependent on any external skill.
+
+### 5. Subagent checkpoint protocol
+
+When using subagent-driven development (dispatching parallel agents), checkpoints
+have different semantics:
+
+**Orchestrator responsibility:** The orchestrator agent runs `strand update` between
+sequential dispatches when a prior subagent made architectural changes. The orchestrator
+cannot update its own baked-in `.strand` context, but it can ensure the on-disk `.strand`
+is fresh before the next subagent reads it.
+
+**Subagent isolation:** Each subagent in a worktree operates on its own copy. If a
+subagent makes architectural changes, it should run `strand update` before completing
+so the orchestrator (or next subagent) gets fresh data.
+
+**Parallel subagents:** When multiple subagents run concurrently on independent tasks,
+no mid-flight checkpoint is needed. The orchestrator runs `strand update` once after
+all parallel subagents complete, before dispatching the next batch.
+
+**Plan format for subagent checkpoints:**
+
+```markdown
+### Task Group 1 (parallel)
+- Task 1a: Implement auth-core module [Subagent A]
+- Task 1b: Implement auth-utils module [Subagent B]
+
+### Checkpoint: Refresh map after Task Group 1 [CHECKPOINT]
+Orchestrator runs `strand update` and reads the new `.strand`.
+Verify new modules appear in DOMAINS and RISK before dispatching Task Group 2.
+
+### Task Group 2 (parallel)
+- Task 2a: Wire importers to auth-core [Subagent C]
+- Task 2b: Update tests [Subagent D]
+```
+
+### 6. `strand update` failure recovery
+
+When `strand update` fails mid-session (e.g., scanner crashes on dangling imports
+during a half-completed refactor):
+
+1. The agent should **not block** on the failed checkpoint. Note the failure and continue
+   with the awareness that `.strand` data is stale.
+2. If the failure is due to broken imports from a partial refactor, complete the refactor
+   step first, then retry `strand update`.
+3. If retries fail, the agent should annotate its reasoning with "`.strand` is stale —
+   structural decisions in this step are based on conversation context, not the map."
+
+**Implementation:** `runGenerate()` currently calls `process.exit(1)` on error. When
+invoked as `strand update` (not `strand generate`), it should print the error but
+return rather than exit, so the calling agent session is not killed.
+
+### 7. `validate-plan --checkpoints` enforcement
+
+Extend the existing `validate-plan` command to detect missing checkpoints:
+
+**Heuristic:** Parse plan steps for file-creation patterns (`Create:`, `create`, `new file`,
+`split into`, `move to`, `delete`, `remove`, `merge`) and warn if no `[CHECKPOINT]` step
+follows within the next 2 steps.
+
+**Output:**
+
+```
+⚠ Step 3 creates new files (src/auth-core.ts, src/auth-utils.ts) but no [CHECKPOINT]
+  follows before Step 5. Consider adding a checkpoint after Step 3.
+```
+
+This converts a forgettable convention into a checkable one. The existing plan-parser
+infrastructure in `validate-plan` already cross-references plan steps against `.strand`
+data, so this is a natural extension.
 
 ---
 
@@ -171,17 +272,42 @@ to remember.
 **CHURN data lags commits.** `strand update` regenerates structural data immediately
 but CHURN comes from `git log`. Uncommitted changes don't appear in CHURN until the
 next commit. This is an acceptable limitation — CHURN is a historical signal, not a
-current-state signal. It doesn't affect blast radius or cascade decisions.
+current-state signal. Deleted files may still appear in CHURN until the deletion is
+committed — agents should be aware of this.
 
 **Context bloat from multiple reads.** If the agent runs `strand update` and reads
-`.strand` three times in a long session, that adds ~10,500 tokens. This is the
-correct trade-off: fresh data is worth the context cost when architecture is changing.
-For sessions where no checkpoints are triggered, cost is zero.
+`.strand` four times in a long session, that adds ~14,000 tokens (~$0.20-0.40 at
+Opus pricing). This is the correct trade-off for sessions with architectural changes.
+For sessions where no checkpoints are triggered, cost is zero. If checkpoint frequency
+exceeds 4 in a session, the agent should consider consolidating remaining steps to
+reduce further reads.
 
-**Automatic detection of "should I checkpoint now?"** This design requires plan
-authors to insert checkpoints. An agent-driven heuristic ("I just created a new
-file, should I regenerate?") is out of scope — it requires the agent to reason about
-its own actions in a structured way that isn't reliably prompted today.
+**Deduplication of old `.strand` from context.** Not controllable from outside the LLM.
+Mitigated by the timestamp-comparison directive and the supersession signal.
+
+**Automatic checkpoint detection.** This design requires plan authors or validation
+tooling to insert/flag checkpoints. A future enhancement could use filesystem watching
+or post-action hooks to detect checkpoint-worthy changes automatically — this is a
+natural candidate for a paid tier feature.
+
+---
+
+## Revenue and Moat Implications
+
+**`strand impact --live` as a paid-tier upsell.** Free users experience the stale-data
+pain with checkpoint-only freshness. Pro users get `strand impact --live` which re-scans
+before answering. This is the most natural upsell because users will hit the failure mode,
+understand why it matters, and want the fix.
+
+**Mid-session checkpoints feed `.strand-history/`.** Each `strand update` during a session
+is a sub-weekly temporal snapshot. Writing lightweight snapshots to `.strand-history/` on
+each checkpoint turns table-stakes freshness into moat-building data that competitors
+cannot retroactively replicate.
+
+**Stale-data warnings in future `strand impact`.** When `strand impact <file>` is called
+and `<file>` mtime is newer than `.strand` generation time, print a warning:
+`"WARNING: <file> modified after .strand was generated. Run strand update for fresh data."`
+One conditional check — catches the most dangerous failure mode automatically.
 
 ---
 
@@ -189,23 +315,32 @@ its own actions in a structured way that isn't reliably prompted today.
 
 | Scenario | Before | After |
 |---|---|---|
-| Agent runs `strand impact` after mid-session refactor | Returns stale cascade chain, agent trusts it | Agent has run checkpoint, reads fresh data, correct cascade |
+| Agent consults RISK after mid-session refactor | Reads stale blast radius, agent trusts it | Agent has run checkpoint, reads fresh data, correct cascade |
 | New file created mid-session | Invisible to manifest, no blast radius | Plan checkpoint triggers regeneration, file appears in next scan |
-| Long session with two .strand versions in context | Agent may prefer either | Supersession signal + trust directive carve-out → agent prefers newer |
-| Plan author forgets checkpoint | Silently accumulates drift | writing-plans convention reminder prompts insertion |
+| Long session with two .strand versions in context | Agent may prefer either | Supersession signal + timestamp directive → agent prefers newer |
+| Plan author forgets checkpoint | Silently accumulates drift | `validate-plan --checkpoints` warns about missing checkpoint |
+| Subagent-driven session | Each subagent reads stale session-start .strand | Orchestrator runs checkpoint between task groups |
+| `strand update` fails mid-refactor | Agent session killed by process.exit(1) | Error printed, agent continues with stale-data annotation |
 
 ---
 
 ## Scope
 
 **In scope:**
-- `strand update` supersession output line
-- Trust directive update in CLAUDE.md template
+- `strand update` supersession output line (add to existing `templates.ts`)
+- Atomic write for `.strand` (write-to-tmp-then-rename)
+- Trust directive update in existing `CLAUDE_MD_SECTION` constant
 - Plan checkpoint convention (`[CHECKPOINT]` tag + criteria)
-- writing-plans reminder
+- Concrete read instructions (Read tool / `cat .strand`, not `@.strand`)
+- Timestamp-based disambiguation for multiple `.strand` versions in context
+- Project-local checkpoint convention in CLAUDE.md (not third-party skill)
+- Subagent checkpoint protocol
+- `strand update` failure recovery (return instead of exit)
+- `validate-plan --checkpoints` enforcement mode
 
 **Out of scope:**
-- Automatic checkpoint detection
+- Automatic checkpoint detection via filesystem watching (paid tier candidate)
 - Mid-session CHURN refresh (requires commits)
 - Deduplication of old `.strand` from context (not controllable from outside the LLM)
-- `strand impact --live` (re-scan on each call) — valid v5 candidate
+- `strand impact --live` (re-scan on each call) — paid tier candidate
+- Session-aware `.strand` with DELTA annotations (paid tier candidate)
