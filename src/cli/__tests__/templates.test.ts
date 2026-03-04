@@ -126,4 +126,10 @@ describe("SUPERSESSION_MESSAGE", () => {
     expect(msg).toContain("supersedes any prior .strand in context");
     expect(msg).toContain(".strand regenerated");
   });
+
+  it("produces ISO-8601 compatible output when given a real timestamp", () => {
+    const ts = new Date().toISOString().slice(0, 19);
+    const msg = SUPERSESSION_MESSAGE(ts);
+    expect(msg).toMatch(/^\.strand regenerated \(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\)/);
+  });
 });

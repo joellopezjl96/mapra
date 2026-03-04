@@ -30,7 +30,7 @@ header line to identify which is newest.
 
 /** Message printed to stdout after strand update to signal context supersession. */
 export function SUPERSESSION_MESSAGE(isoTimestamp: string): string {
-  return `.strand regenerated (${isoTimestamp}) — supersedes any prior .strand in context.`;
+  return `.strand regenerated (${isoTimestamp}) \u2014 supersedes any prior .strand in context.`;
 }
 
 /** Full marked section: start marker + content + end marker + trailing newline. */
