@@ -1,51 +1,135 @@
 import { describe, it, expect } from "vitest";
-import { SUPERSESSION_MESSAGE, CLAUDE_MD_SECTION } from "../templates.js";
+import {
+  applyStrandSection,
+  CLAUDE_MD_SECTION,
+  MARKED_SECTION,
+  STRAND_MARKER_START,
+  STRAND_MARKER_END,
+  SUPERSESSION_MESSAGE,
+} from "../templates.js";
 
-describe("SUPERSESSION_MESSAGE", () => {
-  it("contains a timestamp placeholder token", () => {
-    // The message is a function that takes an ISO timestamp
-    const msg = SUPERSESSION_MESSAGE("2026-03-02T14:22:10");
-    expect(msg).toContain("2026-03-02T14:22:10");
+describe("applyStrandSection", () => {
+  it("Case A: null input creates new CLAUDE.md with markers", () => {
+    const { content, action } = applyStrandSection(null);
+    expect(action).toBe("created");
+    expect(content).toContain("# Project Notes");
+    expect(content).toContain(STRAND_MARKER_START);
+    expect(content).toContain(STRAND_MARKER_END);
+    expect(content).toContain("@.strand");
   });
 
-  it("contains the word 'supersedes'", () => {
-    const msg = SUPERSESSION_MESSAGE("2026-03-02T14:22:10");
-    expect(msg).toContain("supersedes");
+  it("Case B1: markers present with matching content returns up-to-date", () => {
+    const existing = `# My Project\n\n${MARKED_SECTION}`;
+    const { content, action } = applyStrandSection(existing);
+    expect(action).toBe("up-to-date");
+    expect(content).toBe(existing);
   });
 
-  it("mentions 'prior .strand in context'", () => {
-    const msg = SUPERSESSION_MESSAGE("2026-03-02T14:22:10");
-    expect(msg).toContain("prior .strand in context");
+  it("section content includes freshness carve-out", () => {
+    expect(CLAUDE_MD_SECTION).toContain(
+      "always prefer the\nmost recently read version",
+    );
+    expect(CLAUDE_MD_SECTION).toContain("generated");
+  });
+
+  it("Case B2: markers present with different content replaces section", () => {
+    const oldSection = `${STRAND_MARKER_START}\nold content\n${STRAND_MARKER_END}\n`;
+    const existing = `# My Project\n\n${oldSection}`;
+    const { content, action } = applyStrandSection(existing);
+    expect(action).toBe("upgraded");
+    expect(content).toContain(STRAND_MARKER_START);
+    expect(content).toContain(CLAUDE_MD_SECTION);
+    expect(content).toContain(STRAND_MARKER_END);
+    expect(content).not.toContain("old content");
+  });
+
+  it("Case C: legacy @.strand without markers gets legacy-upgraded", () => {
+    const existing =
+      "# Project Notes\n\n---\n\n## Codebase Map\n\nOld description.\n\n@.strand\n";
+    const { content, action } = applyStrandSection(existing);
+    expect(action).toBe("legacy-upgraded");
+    expect(content).toContain(STRAND_MARKER_START);
+    expect(content).toContain(STRAND_MARKER_END);
+    expect(content).toContain("# Project Notes");
+    expect(content).not.toContain("Old description");
+  });
+
+  it("Case D: neither markers nor @.strand appends section", () => {
+    const existing = "# My Project\n\nSome existing content.";
+    const { content, action } = applyStrandSection(existing);
+    expect(action).toBe("appended");
+    expect(content.startsWith("# My Project")).toBe(true);
+    expect(content).toContain("Some existing content.");
+    expect(content).toContain(STRAND_MARKER_START);
+    expect(content).toContain(STRAND_MARKER_END);
+  });
+
+  it("Edge: preserves content above and below legacy section", () => {
+    const existing =
+      "# Notes\n\nAbove content.\n\n---\n\n## Codebase Map\n\nOld text.\n\n@.strand\n\nBelow content.\n";
+    const { content, action } = applyStrandSection(existing);
+    expect(action).toBe("legacy-upgraded");
+    expect(content).toContain("Above content.");
+    expect(content).toContain("Below content.");
+    expect(content).toContain(STRAND_MARKER_START);
+  });
+
+  it("Edge: handles CLAUDE.md that is just the legacy section", () => {
+    const existing = "---\n\n## Codebase Map\n\nOld.\n\n@.strand\n";
+    const { content, action } = applyStrandSection(existing);
+    expect(action).toBe("legacy-upgraded");
+    expect(content).toContain(STRAND_MARKER_START);
+    expect(content).toContain(STRAND_MARKER_END);
+    expect(content.startsWith("\n")).toBe(false);
+  });
+
+  it("Edge: @.strand exists but legacy regex doesn't match — wraps instead of duplicating", () => {
+    const existing = "# Notes\n\nSome custom section with\n\n@.strand\n";
+    const { content, action } = applyStrandSection(existing);
+    expect(action).toBe("legacy-upgraded");
+    expect(content).toContain(STRAND_MARKER_START);
+    // Must not duplicate @.strand
+    const count = (content.match(/@\.strand/g) || []).length;
+    expect(count).toBe(1);
+  });
+
+  it("Edge: markers always wrap CLAUDE_MD_SECTION content exactly", () => {
+    const cases = [
+      applyStrandSection(null), // created
+      applyStrandSection(
+        `# X\n\n${STRAND_MARKER_START}\nold\n${STRAND_MARKER_END}\n`,
+      ), // upgraded
+      applyStrandSection("---\n\n## Codebase Map\n\n@.strand\n"), // legacy-upgraded
+      applyStrandSection("# X"), // appended
+    ];
+
+    for (const { content, action } of cases) {
+      const startIdx = content.indexOf(STRAND_MARKER_START);
+      const endIdx = content.indexOf(STRAND_MARKER_END);
+      expect(startIdx, `${action}: start marker missing`).not.toBe(-1);
+      expect(endIdx, `${action}: end marker missing`).not.toBe(-1);
+      const between = content.slice(
+        startIdx + STRAND_MARKER_START.length,
+        endIdx,
+      );
+      expect(between, `${action}: section content mismatch`).toBe(
+        CLAUDE_MD_SECTION,
+      );
+    }
   });
 });
 
-describe("SUPERSESSION_MESSAGE format", () => {
+describe("SUPERSESSION_MESSAGE", () => {
+  it("includes ISO timestamp and supersession text", () => {
+    const msg = SUPERSESSION_MESSAGE("2026-03-02T14:22:10");
+    expect(msg).toContain("2026-03-02T14:22:10");
+    expect(msg).toContain("supersedes any prior .strand in context");
+    expect(msg).toContain(".strand regenerated");
+  });
+
   it("produces ISO-8601 compatible output when given a real timestamp", () => {
     const ts = new Date().toISOString().slice(0, 19);
     const msg = SUPERSESSION_MESSAGE(ts);
-    // Verify the full line matches the expected shape
-    expect(msg).toMatch(/^\.strand regenerated \(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\) — supersedes any prior \.strand in context\.$/)
-  });
-});
-
-describe("CLAUDE_MD_SECTION", () => {
-  it("contains the @.strand reference", () => {
-    expect(CLAUDE_MD_SECTION).toContain("@.strand");
-  });
-
-  it("contains the mid-session carve-out", () => {
-    expect(CLAUDE_MD_SECTION).toContain("most recently read .strand");
-  });
-
-  it("contains the original trust directive", () => {
-    expect(CLAUDE_MD_SECTION).toContain("ground truth");
-  });
-
-  it("contains trust directive WITH the mid-session carve-out", () => {
-    // Old directive had no mention of mid-session handling.
-    // New directive keeps the trust directive but adds carve-out language.
-    expect(CLAUDE_MD_SECTION).toContain("ground truth");
-    expect(CLAUDE_MD_SECTION).toContain("strand update");
-    expect(CLAUDE_MD_SECTION).toContain("most recently read .strand");
+    expect(msg).toMatch(/^\.strand regenerated \(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\)/);
   });
 });

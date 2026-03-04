@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /**
  * strand CLI
  *
@@ -7,13 +8,13 @@
  *   strand update [path]   Regenerate .strand in place (alias for generate in cwd)
  *   strand init [path]     Wire .strand into project's CLAUDE.md
  *   strand status [path]   Show current strand setup state
- *   strand validate-plan <plan.md> [--since YYYY-MM-DD]  Cross-reference plan against .strand
+ *   strand validate-plan <plan.md> [--since YYYY-MM-DD] [--checkpoints]  Cross-reference plan against .strand
  *   strand batch <config.json> [--resume]  Run batch experiment from config
  */
 
 import * as fs from "fs";
 import * as path from "path";
-import { SUPERSESSION_MESSAGE, CLAUDE_MD_SECTION } from "./templates.js";
+import { applyStrandSection, SUPERSESSION_MESSAGE, type StrandAction } from "./templates.js";
 
 const [, , command, ...args] = process.argv;
 
@@ -39,7 +40,16 @@ switch (command) {
     await runGenerate(args[0]);
     break;
   case "update":
-    await runGenerate(args[0] ?? process.cwd());
+    try {
+      await runGenerate(args[0] ?? process.cwd(), true);
+    } catch (err) {
+      console.error(
+        `strand update failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      console.error(
+        "Continuing with stale .strand. Complete your refactor and retry.",
+      );
+    }
     break;
   case "init":
     await runInit(args[0]);
@@ -48,11 +58,13 @@ switch (command) {
     await runStatus(args[0]);
     break;
   case "validate-plan": {
-    // Handle: strand validate-plan plan.md --since 2026-02-25
     const sinceIdx = args.indexOf("--since");
     const since = sinceIdx >= 0 ? args[sinceIdx + 1] : undefined;
-    const planFile = args.find((a) => !a.startsWith("--") && a !== since);
-    await runValidatePlan(planFile, since);
+    const checkpoints = args.includes("--checkpoints");
+    const planFile = args.find(
+      (a) => !a.startsWith("--") && a !== since,
+    );
+    await runValidatePlan(planFile, since, checkpoints);
     break;
   }
   case "batch": {
@@ -81,7 +93,7 @@ Commands:
   update [path]   Regenerate .strand in place (alias for generate in cwd)
   init [path]     Wire @.strand reference into project's CLAUDE.md
   status [path]   Show whether .strand is present, wired, and fresh
-  validate-plan <plan.md> [--since YYYY-MM-DD]
+  validate-plan <plan.md> [--since YYYY-MM-DD] [--checkpoints]
                   Cross-reference plan file paths against .strand data
   batch <config.json> [--resume]
                   Run batch experiment comparing encoding conditions
@@ -105,7 +117,7 @@ async function runSetup(targetArg?: string) {
   console.log("\nDone. Open Claude Code and ask about your codebase.");
 }
 
-async function runGenerate(targetArg?: string) {
+async function runGenerate(targetArg?: string, softFail = false) {
   const targetPath = resolveTarget(targetArg);
 
   try {
@@ -134,12 +146,25 @@ async function runGenerate(targetArg?: string) {
     const encoded = encodeToStrandFormat(graph, analysis);
     const tokens = Math.round(encoded.length / 4);
 
-    fs.writeFileSync(outputPath, encoded, "utf-8");
+    const tmpPath = outputPath + ".tmp";
+    fs.writeFileSync(tmpPath, encoded, "utf-8");
+    try {
+      fs.renameSync(tmpPath, outputPath);
+    } catch {
+      // Windows: rename can fail if another process holds a read handle.
+      // Fall back to direct write.
+      fs.writeFileSync(outputPath, encoded, "utf-8");
+    } finally {
+      try { fs.unlinkSync(tmpPath); } catch { /* .tmp already renamed or gone */ }
+    }
+
+    const timestamp = new Date().toISOString().replace(/\.\d{3}Z$/, "");
     console.log(
       `\nWrote .strand  (${encoded.length.toLocaleString()} chars  ~${tokens} tokens)`,
     );
-    console.log(SUPERSESSION_MESSAGE(new Date().toISOString().slice(0, 19)));
+    console.log(SUPERSESSION_MESSAGE(timestamp));
   } catch (err) {
+    if (softFail) throw err;
     handleError("generate", err);
   }
 }
@@ -166,26 +191,26 @@ async function runInit(targetArg?: string) {
       process.exit(1);
     }
 
-    const section = CLAUDE_MD_SECTION;
+    const existingContent = fs.existsSync(claudePath)
+      ? fs.readFileSync(claudePath, "utf-8")
+      : null;
 
-    if (!fs.existsSync(claudePath)) {
-      // Create a minimal CLAUDE.md
-      const content = `# Project Notes\n${section}`;
-      fs.writeFileSync(claudePath, content, "utf-8");
-      console.log(`Created CLAUDE.md and wired @.strand`);
+    const { content, action } = applyStrandSection(existingContent);
+
+    if (action === "up-to-date") {
+      console.log(`Already up to date — CLAUDE.md has current strand section`);
       return;
     }
 
-    const existing = fs.readFileSync(claudePath, "utf-8");
+    fs.writeFileSync(claudePath, content, "utf-8");
 
-    // Idempotent: check for @.strand on its own line
-    if (/^@\.strand$/m.test(existing)) {
-      console.log(`Already wired — CLAUDE.md already references @.strand`);
-      return;
-    }
-
-    fs.writeFileSync(claudePath, existing.trimEnd() + "\n" + section, "utf-8");
-    console.log(`Wired — added @.strand reference to ${claudePath}`);
+    const messages: Record<Exclude<StrandAction, "up-to-date">, string> = {
+      created: `Created CLAUDE.md and wired @.strand`,
+      upgraded: `Upgraded strand section in CLAUDE.md`,
+      "legacy-upgraded": `Upgraded CLAUDE.md — added section markers for future updates`,
+      appended: `Wired — added @.strand reference to ${claudePath}`,
+    };
+    console.log(messages[action]);
   } catch (err) {
     handleError("init", err);
   }
@@ -238,9 +263,13 @@ async function runStatus(targetArg?: string) {
   console.log();
 }
 
-async function runValidatePlan(planArg?: string, sinceDate?: string) {
+async function runValidatePlan(
+  planArg?: string,
+  sinceDate?: string,
+  checkpoints = false,
+) {
   if (!planArg) {
-    console.error("Usage: strand validate-plan <plan.md> [--since YYYY-MM-DD]");
+    console.error("Usage: strand validate-plan <plan.md> [--since YYYY-MM-DD] [--checkpoints]");
     process.exit(1);
   }
 
@@ -276,7 +305,7 @@ async function runValidatePlan(planArg?: string, sinceDate?: string) {
     );
   }
 
-  const { extractFilePaths } = await import("./plan-parser.js");
+  const { extractFilePaths, detectMissingCheckpoints } = await import("./plan-parser.js");
   const { scanCodebase } = await import("../scanner/index.js");
   const { analyzeGraph } = await import("../analyzer/index.js");
 
@@ -459,6 +488,25 @@ async function runValidatePlan(planArg?: string, sinceDate?: string) {
   console.log(
     `SUMMARY: ${stale.length} stale, ${highCascade.length} high-cascade, ${deadRefs.length} dead-code, ${notFound.length} new files`,
   );
+
+  // Checkpoint validation
+  if (checkpoints) {
+    const cpWarnings = detectMissingCheckpoints(planContent);
+    if (cpWarnings.length > 0) {
+      console.log("\nMISSING CHECKPOINTS:");
+      for (const w of cpWarnings) {
+        console.log(`  \u26A0 ${w}`);
+      }
+      console.log(
+        `\n  Add [CHECKPOINT] steps after architectural changes: run \`strand update\`,`,
+      );
+      console.log(
+        `  then use the Read tool or \`cat .strand\` to load fresh data into context.`,
+      );
+    } else {
+      console.log("\nCHECKPOINTS: all architectural steps have checkpoints.");
+    }
+  }
 }
 
 async function runBatchCommand(configArg?: string, resume?: boolean) {
