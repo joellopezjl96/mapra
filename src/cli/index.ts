@@ -154,7 +154,8 @@ async function runGenerate(targetArg?: string, softFail = false) {
       // Windows: rename can fail if another process holds a read handle.
       // Fall back to direct write.
       fs.writeFileSync(outputPath, encoded, "utf-8");
-      try { fs.unlinkSync(tmpPath); } catch { /* ignore cleanup failure */ }
+    } finally {
+      try { fs.unlinkSync(tmpPath); } catch { /* .tmp already renamed or gone */ }
     }
 
     const timestamp = new Date().toISOString().replace(/\.\d{3}Z$/, "");
@@ -268,7 +269,7 @@ async function runValidatePlan(
   checkpoints = false,
 ) {
   if (!planArg) {
-    console.error("Usage: strand validate-plan <plan.md> [--since YYYY-MM-DD]");
+    console.error("Usage: strand validate-plan <plan.md> [--since YYYY-MM-DD] [--checkpoints]");
     process.exit(1);
   }
 
@@ -304,7 +305,7 @@ async function runValidatePlan(
     );
   }
 
-  const { extractFilePaths } = await import("./plan-parser.js");
+  const { extractFilePaths, detectMissingCheckpoints } = await import("./plan-parser.js");
   const { scanCodebase } = await import("../scanner/index.js");
   const { analyzeGraph } = await import("../analyzer/index.js");
 
@@ -490,7 +491,6 @@ async function runValidatePlan(
 
   // Checkpoint validation
   if (checkpoints) {
-    const { detectMissingCheckpoints } = await import("./plan-parser.js");
     const cpWarnings = detectMissingCheckpoints(planContent);
     if (cpWarnings.length > 0) {
       console.log("\nMISSING CHECKPOINTS:");
