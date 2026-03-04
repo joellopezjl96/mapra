@@ -17,6 +17,7 @@ import { generateMarkdownReport } from "./reporter.js";
 import type {
   BatchConfig,
   BatchResults,
+  Condition,
   QuestionResult,
   ConditionResult,
   TrialResult,
@@ -50,11 +51,10 @@ export async function runBatch(
     `  ${config.codebases.length} codebase(s), ${config.conditions.length} conditions, ${config.questions.length} questions, ${config.trials} trials`,
   );
 
-  const totalCalls =
-    config.codebases.length *
-    config.conditions.length *
-    config.questions.length *
-    config.trials;
+  const totalCalls = config.codebases.length * config.conditions.reduce(
+    (sum, c) => sum + (c.trials ?? config.trials) * config.questions.length,
+    0,
+  );
   onProgress(
     `  Total API calls: ${totalCalls} trials + ${totalCalls} judge = ${totalCalls * 2}`,
   );
@@ -71,7 +71,9 @@ export async function runBatch(
     results = checkpoint.results;
     for (const qr of results) {
       for (const cr of qr.conditions) {
-        if (cr.trials.length >= config.trials) {
+        const cond = config.conditions.find((c) => c.id === cr.conditionId);
+        const trialsNeeded = cond?.trials ?? config.trials;
+        if (cr.trials.length >= trialsNeeded) {
           completed.add(
             keyFor({
               questionId: qr.questionId,
@@ -112,12 +114,7 @@ export async function runBatch(
 
     const conditionEncodings = new Map<string, string>();
     for (const condition of config.conditions) {
-      const encoding = buildEncoding(
-        graph,
-        analysis,
-        condition.encoding,
-        condition.includeUsageLine,
-      );
+      const encoding = buildEncoding(graph, analysis, condition);
       conditionEncodings.set(condition.id, encoding);
       if (encoding.length > 0) {
         onProgress(
@@ -180,7 +177,8 @@ export async function runBatch(
 
         const encoding = conditionEncodings.get(condition.id) ?? "";
 
-        for (let t = cr.trials.length; t < config.trials; t++) {
+        const trialsForCondition = condition.trials ?? config.trials;
+        for (let t = cr.trials.length; t < trialsForCondition; t++) {
           callCount++;
           onProgress(
             `  [${callCount}/${totalCalls}] ${question.id} × ${condition.name} trial ${t + 1}`,
@@ -326,20 +324,26 @@ function loadConfig(configPath: string): BatchConfig {
 function buildEncoding(
   graph: StrandGraph,
   analysis: GraphAnalysis,
-  encoding: "strand-v3" | "strand-v2" | "text" | "none",
-  includeUsageLine?: boolean,
+  condition: Condition,
 ): string {
-  switch (encoding) {
+  switch (condition.encoding) {
     case "strand-v3": {
       let enc = encodeToStrandFormat(graph, analysis);
-      if (includeUsageLine === false) {
-        // Strip just the USAGE line
+      if (condition.includeUsageLine === false) {
         enc = enc.replace(/^USAGE:.*\n/m, "");
+      }
+      if (condition.excludeSections?.length) {
+        for (const section of condition.excludeSections) {
+          enc = enc.replace(
+            new RegExp(`─── ${section}[\\s\\S]*?(?=\\n─── |\\s*$)`),
+            "",
+          );
+        }
+        enc = enc.replace(/\n{3,}/g, "\n\n");
       }
       return enc;
     }
     case "strand-v2": {
-      // v2: no USAGE line, no CHURN section, no CONVENTIONS section
       let enc = encodeToStrandFormat(graph, analysis);
       enc = enc.replace(/^USAGE:.*\n/m, "");
       enc = enc.replace(/─── CHURN[\s\S]*?(?=\n─── )/m, "");

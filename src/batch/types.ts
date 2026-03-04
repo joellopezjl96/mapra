@@ -18,6 +18,8 @@ export interface Condition {
   model: string;
   encoding: "strand-v3" | "strand-v2" | "text" | "none";
   includeUsageLine?: boolean;
+  excludeSections?: string[];
+  trials?: number;
 }
 
 export interface Assertion {
