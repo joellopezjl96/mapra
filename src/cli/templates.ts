@@ -24,6 +24,11 @@ files when you need implementation details the encoding doesn't provide.
 @.strand
 `;
 
+/** Message printed to stdout after strand update to signal context supersession. */
+export function SUPERSESSION_MESSAGE(isoTimestamp: string): string {
+  return `.strand regenerated (${isoTimestamp}) — supersedes any prior .strand in context.`;
+}
+
 /** Full marked section: start marker + content + end marker + trailing newline. */
 export const MARKED_SECTION = `${STRAND_MARKER_START}${CLAUDE_MD_SECTION}${STRAND_MARKER_END}\n`;
 

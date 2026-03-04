@@ -5,6 +5,7 @@ import {
   MARKED_SECTION,
   STRAND_MARKER_START,
   STRAND_MARKER_END,
+  SUPERSESSION_MESSAGE,
 } from "../templates.js";
 
 describe("applyStrandSection", () => {
@@ -108,5 +109,14 @@ describe("applyStrandSection", () => {
         CLAUDE_MD_SECTION,
       );
     }
+  });
+});
+
+describe("SUPERSESSION_MESSAGE", () => {
+  it("includes ISO timestamp and supersession text", () => {
+    const msg = SUPERSESSION_MESSAGE("2026-03-02T14:22:10");
+    expect(msg).toContain("2026-03-02T14:22:10");
+    expect(msg).toContain("supersedes any prior .strand in context");
+    expect(msg).toContain(".strand regenerated");
   });
 });
