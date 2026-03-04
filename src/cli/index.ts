@@ -14,7 +14,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import { applyStrandSection, type StrandAction } from "./templates.js";
+import { applyStrandSection, SUPERSESSION_MESSAGE, type StrandAction } from "./templates.js";
 
 const [, , command, ...args] = process.argv;
 
@@ -135,10 +135,22 @@ async function runGenerate(targetArg?: string) {
     const encoded = encodeToStrandFormat(graph, analysis);
     const tokens = Math.round(encoded.length / 4);
 
-    fs.writeFileSync(outputPath, encoded, "utf-8");
+    const tmpPath = outputPath + ".tmp";
+    fs.writeFileSync(tmpPath, encoded, "utf-8");
+    try {
+      fs.renameSync(tmpPath, outputPath);
+    } catch {
+      // Windows: rename can fail if another process holds a read handle.
+      // Fall back to direct write.
+      fs.writeFileSync(outputPath, encoded, "utf-8");
+      try { fs.unlinkSync(tmpPath); } catch { /* ignore cleanup failure */ }
+    }
+
+    const timestamp = new Date().toISOString().replace(/\.\d{3}Z$/, "");
     console.log(
       `\nWrote .strand  (${encoded.length.toLocaleString()} chars  ~${tokens} tokens)`,
     );
+    console.log(SUPERSESSION_MESSAGE(timestamp));
   } catch (err) {
     handleError("generate", err);
   }
