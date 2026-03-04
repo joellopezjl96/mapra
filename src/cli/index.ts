@@ -8,7 +8,7 @@
  *   strand update [path]   Regenerate .strand in place (alias for generate in cwd)
  *   strand init [path]     Wire .strand into project's CLAUDE.md
  *   strand status [path]   Show current strand setup state
- *   strand validate-plan <plan.md> [--since YYYY-MM-DD]  Cross-reference plan against .strand
+ *   strand validate-plan <plan.md> [--since YYYY-MM-DD] [--checkpoints]  Cross-reference plan against .strand
  *   strand batch <config.json> [--resume]  Run batch experiment from config
  */
 
@@ -58,11 +58,13 @@ switch (command) {
     await runStatus(args[0]);
     break;
   case "validate-plan": {
-    // Handle: strand validate-plan plan.md --since 2026-02-25
     const sinceIdx = args.indexOf("--since");
     const since = sinceIdx >= 0 ? args[sinceIdx + 1] : undefined;
-    const planFile = args.find((a) => !a.startsWith("--") && a !== since);
-    await runValidatePlan(planFile, since);
+    const checkpoints = args.includes("--checkpoints");
+    const planFile = args.find(
+      (a) => !a.startsWith("--") && a !== since,
+    );
+    await runValidatePlan(planFile, since, checkpoints);
     break;
   }
   case "batch": {
@@ -91,7 +93,7 @@ Commands:
   update [path]   Regenerate .strand in place (alias for generate in cwd)
   init [path]     Wire @.strand reference into project's CLAUDE.md
   status [path]   Show whether .strand is present, wired, and fresh
-  validate-plan <plan.md> [--since YYYY-MM-DD]
+  validate-plan <plan.md> [--since YYYY-MM-DD] [--checkpoints]
                   Cross-reference plan file paths against .strand data
   batch <config.json> [--resume]
                   Run batch experiment comparing encoding conditions
@@ -260,7 +262,11 @@ async function runStatus(targetArg?: string) {
   console.log();
 }
 
-async function runValidatePlan(planArg?: string, sinceDate?: string) {
+async function runValidatePlan(
+  planArg?: string,
+  sinceDate?: string,
+  checkpoints = false,
+) {
   if (!planArg) {
     console.error("Usage: strand validate-plan <plan.md> [--since YYYY-MM-DD]");
     process.exit(1);
@@ -481,6 +487,26 @@ async function runValidatePlan(planArg?: string, sinceDate?: string) {
   console.log(
     `SUMMARY: ${stale.length} stale, ${highCascade.length} high-cascade, ${deadRefs.length} dead-code, ${notFound.length} new files`,
   );
+
+  // Checkpoint validation
+  if (checkpoints) {
+    const { detectMissingCheckpoints } = await import("./plan-parser.js");
+    const cpWarnings = detectMissingCheckpoints(planContent);
+    if (cpWarnings.length > 0) {
+      console.log("\nMISSING CHECKPOINTS:");
+      for (const w of cpWarnings) {
+        console.log(`  \u26A0 ${w}`);
+      }
+      console.log(
+        `\n  Add [CHECKPOINT] steps after architectural changes: run \`strand update\`,`,
+      );
+      console.log(
+        `  then use the Read tool or \`cat .strand\` to load fresh data into context.`,
+      );
+    } else {
+      console.log("\nCHECKPOINTS: all architectural steps have checkpoints.");
+    }
+  }
 }
 
 async function runBatchCommand(configArg?: string, resume?: boolean) {
