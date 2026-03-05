@@ -117,6 +117,7 @@ export async function runBatch(
         analysis,
         condition.encoding,
         condition.includeUsageLine,
+        condition.excludeSections,
       );
       conditionEncodings.set(condition.id, encoding);
       if (encoding.length > 0) {
@@ -323,11 +324,35 @@ function loadConfig(configPath: string): BatchConfig {
 
 // ─── Encoding ───────────────────────────────────────────
 
+/**
+ * Strip named sections from a .strand encoding.
+ * Section headers follow the pattern: ─── SECTION_NAME ...
+ * Matches by prefix (e.g., "RISK" matches "RISK (change with care)").
+ */
+export function stripSections(encoding: string, sectionNames: string[]): string {
+  if (!sectionNames.length) return encoding;
+
+  let result = encoding;
+  for (const name of sectionNames) {
+    // Match from section header to next section header (or end of string)
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const pattern = new RegExp(
+      `\\n─── ${escaped}[^\\n]*─+\\n[\\s\\S]*?(?=\\n─── |$)`,
+    );
+    result = result.replace(pattern, "");
+  }
+
+  // Clean up any resulting triple+ blank lines
+  result = result.replace(/\n{3,}/g, "\n\n");
+  return result;
+}
+
 function buildEncoding(
   graph: StrandGraph,
   analysis: GraphAnalysis,
   encoding: "strand-v3" | "strand-v2" | "text" | "text-bare" | "none",
   includeUsageLine?: boolean,
+  excludeSections?: string[],
 ): string {
   switch (encoding) {
     case "strand-v3": {
@@ -335,6 +360,9 @@ function buildEncoding(
       if (includeUsageLine === false) {
         // Strip just the USAGE line
         enc = enc.replace(/^USAGE:.*\n/m, "");
+      }
+      if (excludeSections?.length) {
+        enc = stripSections(enc, excludeSections);
       }
       return enc;
     }
