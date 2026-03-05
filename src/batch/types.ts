@@ -35,7 +35,8 @@ export type TaskType =
   | "impact"
   | "review"
   | "inventory"
-  | "architecture";
+  | "architecture"
+  | "change-safety";
 
 export interface Question {
   id: string;
