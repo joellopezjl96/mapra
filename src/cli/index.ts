@@ -81,7 +81,7 @@ switch (command) {
 
 function printHelp() {
   console.log(`
-strand — codebase cartography for AI
+strand — stop exploring. start building.
 
 Quick start:
   strand                        Run setup in current directory (first-time setup)

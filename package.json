@@ -1,7 +1,7 @@
 {
   "name": "strand",
   "version": "0.1.0",
-  "description": "Cartography for codebases — a visual encoding format that lets AI see your project",
+  "description": "Codebase intelligence for AI agents — stop exploring, start building",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
