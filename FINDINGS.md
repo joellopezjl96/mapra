@@ -2,7 +2,7 @@
 
 Research log tracking what we've learned about encoding codebases for LLM consumption.
 
-**Project:** Strand — codebase cartography for AI
+**Project:** Strand — stop exploring, start building
 **Target codebase:** SenorBurritoCompany (Next.js 14, 289 files, 49,966 lines, 27 modules)
 **Model:** claude-sonnet-4-20250514 (1024 max tokens)
 **5 standard questions:** inventory (Q1), analysis (Q2), navigation (Q3), architecture (Q4), dependency (Q5)
