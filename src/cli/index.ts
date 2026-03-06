@@ -16,6 +16,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { applyStrandSection, SUPERSESSION_MESSAGE, type StrandAction } from "./templates.js";
 import { installAllHooks, uninstallAllHooks } from "./hooks.js";
+import { generateHookShim } from "./shim.js";
 
 const [, , command, ...args] = process.argv;
 
@@ -133,10 +134,69 @@ Examples:
 
 async function runSetup(targetArg?: string) {
   console.log("Setting up strnd...\n");
+  const targetPath = resolveTarget(targetArg ?? process.cwd());
+
+  // Step 1: Generate .strand
   await runGenerate(targetArg);
   console.log();
+
+  // Step 2: Wire CLAUDE.md
   await runInit(targetArg);
-  console.log("\nDone. Open Claude Code and ask about your codebase.");
+
+  // Step 3: Write .strnd/hook.mjs
+  const strndDir = path.join(targetPath, ".strnd");
+  fs.mkdirSync(strndDir, { recursive: true });
+
+  const version = getVersion();
+  const shimContent = generateHookShim(version);
+  fs.writeFileSync(
+    path.join(strndDir, "hook.mjs"),
+    shimContent.replace(/\r\n/g, "\n"),
+  );
+  console.log("Wrote .strnd/hook.mjs (auto-update shim)");
+
+  // Step 4: Write .strnd/.gitignore (ignore lockfile)
+  fs.writeFileSync(
+    path.join(strndDir, ".gitignore"),
+    ".lock\n",
+  );
+
+  // Step 5: Install git hooks
+  const { installed, skipped } = installAllHooks(targetPath);
+  if (skipped) {
+    console.warn(`\u26A0 ${skipped} \u2014 skipping hook installation`);
+  } else {
+    console.log(
+      `Installed git hooks (${installed.join(", ")})`,
+    );
+  }
+
+  // Step 6: Add .gitattributes entry for linguist-generated
+  const gitattrsPath = path.join(targetPath, ".gitattributes");
+  const gitattrsEntry = ".strnd/hook.mjs linguist-generated=true";
+  if (fs.existsSync(gitattrsPath)) {
+    const existing = fs.readFileSync(gitattrsPath, "utf-8");
+    if (!existing.includes(gitattrsEntry)) {
+      const separator = existing.endsWith("\n") ? "" : "\n";
+      fs.writeFileSync(gitattrsPath, existing + separator + gitattrsEntry + "\n");
+    }
+  } else {
+    fs.writeFileSync(gitattrsPath, gitattrsEntry + "\n");
+  }
+
+  console.log(
+    "\nDone. Your codebase map will stay fresh automatically.",
+  );
+}
+
+function getVersion(): string {
+  try {
+    const pkgPath = new URL("../../package.json", import.meta.url);
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
+    return pkg.version ?? "0.0.0";
+  } catch {
+    return "0.0.0";
+  }
 }
 
 async function runGenerate(targetArg?: string, softFail = false, silent = false) {
