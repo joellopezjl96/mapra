@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 /**
- * strand CLI
+ * strnd CLI
  *
  * Commands:
- *   strand setup [path]    Generate .strand and wire CLAUDE.md (first-time setup)
- *   strand generate [path] Scan codebase and write .strand file
- *   strand update [path]   Regenerate .strand in place (alias for generate in cwd)
- *   strand init [path]     Wire .strand into project's CLAUDE.md
- *   strand status [path]   Show current strand setup state
- *   strand validate-plan <plan.md> [--since YYYY-MM-DD] [--checkpoints]  Cross-reference plan against .strand
- *   strand batch <config.json> [--resume]  Run batch experiment from config
+ *   strnd setup [path]    Generate .strand and wire CLAUDE.md (first-time setup)
+ *   strnd generate [path] Scan codebase and write .strand file
+ *   strnd update [path]   Regenerate .strand in place (alias for generate in cwd)
+ *   strnd init [path]     Wire .strand into project's CLAUDE.md
+ *   strnd status [path]   Show current strnd setup state
+ *   strnd validate-plan <plan.md> [--since YYYY-MM-DD] [--checkpoints]  Cross-reference plan against .strand
+ *   strnd batch <config.json> [--resume]  Run batch experiment from config
  */
 
 import * as fs from "fs";
@@ -27,7 +27,7 @@ if (!command) {
   console.log(
     "No command given — running setup (generate + init) in current directory.",
   );
-  console.log("Use 'strand --help' to see all commands.\n");
+  console.log("Use 'strnd --help' to see all commands.\n");
   await runSetup(undefined);
   process.exit(0);
 }
@@ -36,15 +36,20 @@ switch (command) {
   case "setup":
     await runSetup(args[0]);
     break;
-  case "generate":
-    await runGenerate(args[0]);
+  case "generate": {
+    const silent = args.includes("--silent");
+    const targetArg = args.find((a) => !a.startsWith("--"));
+    await runGenerate(targetArg, false, silent);
     break;
+  }
   case "update":
     try {
-      await runGenerate(args[0] ?? process.cwd(), true);
+      const silent = args.includes("--silent");
+      const targetArg = args.find((a) => !a.startsWith("--"));
+      await runGenerate(targetArg ?? process.cwd(), true, silent);
     } catch (err) {
       console.error(
-        `strand update failed: ${err instanceof Error ? err.message : String(err)}`,
+        `strnd update failed: ${err instanceof Error ? err.message : String(err)}`,
       );
       console.error(
         "Continuing with stale .strand. Complete your refactor and retry.",
@@ -81,11 +86,11 @@ switch (command) {
 
 function printHelp() {
   console.log(`
-strand — stop exploring. start building.
+strnd — stop exploring. start building.
 
 Quick start:
-  strand                        Run setup in current directory (first-time setup)
-  strand update                 Regenerate .strand after codebase changes
+  strnd                        Run setup in current directory (first-time setup)
+  strnd update                 Regenerate .strand after codebase changes
 
 Commands:
   setup [path]    Run generate then init (recommended for first-time setup)
@@ -101,23 +106,23 @@ Commands:
   Default path: current working directory
 
 Examples:
-  strand setup                      # first-time setup in cwd
-  strand setup /path/to/project     # first-time setup for a specific project
-  strand update                     # refresh after code changes
-  strand status                     # check current state
-  strand batch experiments/configs/strand-v3-effectiveness.json
+  strnd setup                      # first-time setup in cwd
+  strnd setup /path/to/project     # first-time setup for a specific project
+  strnd update                     # refresh after code changes
+  strnd status                     # check current state
+  strnd batch experiments/configs/strand-v3-effectiveness.json
 `);
 }
 
 async function runSetup(targetArg?: string) {
-  console.log("Setting up strand...\n");
+  console.log("Setting up strnd...\n");
   await runGenerate(targetArg);
   console.log();
   await runInit(targetArg);
   console.log("\nDone. Open Claude Code and ask about your codebase.");
 }
 
-async function runGenerate(targetArg?: string, softFail = false) {
+async function runGenerate(targetArg?: string, softFail = false, silent = false) {
   const targetPath = resolveTarget(targetArg);
 
   try {
@@ -128,7 +133,7 @@ async function runGenerate(targetArg?: string, softFail = false) {
 
     const outputPath = path.join(targetPath, ".strand");
 
-    console.log(`Scanning ${targetPath}`);
+    if (!silent) console.log(`Scanning ${targetPath}`);
     const graph = await Promise.resolve(scanCodebase(targetPath));
 
     const riskCount = graph.nodes.filter(
@@ -138,9 +143,11 @@ async function runGenerate(targetArg?: string, softFail = false) {
         graph.edges.filter((e) => e.to === n.id).length > 3,
     ).length;
 
-    console.log(
-      `  ${graph.totalFiles} files  ${graph.totalLines.toLocaleString()} lines  ${graph.modules.length} modules  ${riskCount} high-import files`,
-    );
+    if (!silent) {
+      console.log(
+        `  ${graph.totalFiles} files  ${graph.totalLines.toLocaleString()} lines  ${graph.modules.length} modules  ${riskCount} high-import files`,
+      );
+    }
 
     const analysis = analyzeGraph(graph, targetPath);
     const encoded = encodeToStrandFormat(graph, analysis);
@@ -158,11 +165,13 @@ async function runGenerate(targetArg?: string, softFail = false) {
       try { fs.unlinkSync(tmpPath); } catch { /* .tmp already renamed or gone */ }
     }
 
-    const timestamp = new Date().toISOString().replace(/\.\d{3}Z$/, "");
-    console.log(
-      `\nWrote .strand  (${encoded.length.toLocaleString()} chars  ~${tokens} tokens)`,
-    );
-    console.log(SUPERSESSION_MESSAGE(timestamp));
+    if (!silent) {
+      const timestamp = new Date().toISOString().replace(/\.\d{3}Z$/, "");
+      console.log(
+        `\nWrote .strand  (${encoded.length.toLocaleString()} chars  ~${tokens} tokens)`,
+      );
+      console.log(SUPERSESSION_MESSAGE(timestamp));
+    }
   } catch (err) {
     if (softFail) throw err;
     handleError("generate", err);
@@ -179,14 +188,14 @@ async function runInit(targetArg?: string) {
     // Guard: .strand must exist and be non-empty
     if (!fs.existsSync(strandPath)) {
       console.error(`Error: .strand not found at ${strandPath}`);
-      console.error(`Run 'strand generate' or 'strand setup' first.`);
+      console.error(`Run 'strnd generate' or 'strnd setup' first.`);
       process.exit(1);
     }
 
     const strandSize = fs.statSync(strandPath).size;
     if (strandSize < 100) {
       console.error(
-        `Warning: .strand appears malformed (${strandSize} bytes). Re-run 'strand generate'.`,
+        `Warning: .strand appears malformed (${strandSize} bytes). Re-run 'strnd generate'.`,
       );
       process.exit(1);
     }
@@ -198,7 +207,7 @@ async function runInit(targetArg?: string) {
     const { content, action } = applyStrandSection(existingContent);
 
     if (action === "up-to-date") {
-      console.log(`Already up to date — CLAUDE.md has current strand section`);
+      console.log(`Already up to date — CLAUDE.md has current strnd section`);
       return;
     }
 
@@ -206,7 +215,7 @@ async function runInit(targetArg?: string) {
 
     const messages: Record<Exclude<StrandAction, "up-to-date">, string> = {
       created: `Created CLAUDE.md and wired @.strand`,
-      upgraded: `Upgraded strand section in CLAUDE.md`,
+      upgraded: `Upgraded strnd section in CLAUDE.md`,
       "legacy-upgraded": `Upgraded CLAUDE.md — added section markers for future updates`,
       appended: `Wired — added @.strand reference to ${claudePath}`,
     };
@@ -226,7 +235,7 @@ async function runStatus(targetArg?: string) {
 
   // .strand presence and staleness
   if (!fs.existsSync(strandPath)) {
-    console.log(`  .strand       ✗ not found (run 'strand setup')`);
+    console.log(`  .strand       ✗ not found (run 'strnd setup')`);
   } else {
     const strandMtime = fs.statSync(strandPath).mtimeMs;
     const sourceMtime = newestSourceFileMtime(targetPath);
@@ -235,18 +244,18 @@ async function runStatus(targetArg?: string) {
     const ageStr =
       ageDays === 0 ? "today" : `${ageDays} day${ageDays !== 1 ? "s" : ""} ago`;
     const stale = sourceMtime > strandMtime;
-    const staleStr = stale ? " ⚠ may be stale (run 'strand update')" : "";
+    const staleStr = stale ? " ⚠ may be stale (run 'strnd update')" : "";
     console.log(`  .strand       ✓ present (updated ${ageStr})${staleStr}`);
   }
 
   // CLAUDE.md wiring
   if (!fs.existsSync(claudePath)) {
-    console.log(`  CLAUDE.md     ✗ not found (run 'strand init')`);
+    console.log(`  CLAUDE.md     ✗ not found (run 'strnd init')`);
   } else {
     const content = fs.readFileSync(claudePath, "utf-8");
     const wired = /^@\.strand$/m.test(content);
     console.log(
-      `  CLAUDE.md     ${wired ? "✓ wired" : "✗ not wired (run 'strand init')"}`,
+      `  CLAUDE.md     ${wired ? "✓ wired" : "✗ not wired (run 'strnd init')"}`,
     );
   }
 
@@ -269,7 +278,7 @@ async function runValidatePlan(
   checkpoints = false,
 ) {
   if (!planArg) {
-    console.error("Usage: strand validate-plan <plan.md> [--since YYYY-MM-DD] [--checkpoints]");
+    console.error("Usage: strnd validate-plan <plan.md> [--since YYYY-MM-DD] [--checkpoints]");
     process.exit(1);
   }
 
@@ -288,7 +297,7 @@ async function runValidatePlan(
 
   const strandPath = path.join(projectRoot, ".strand");
   if (!fs.existsSync(strandPath)) {
-    console.error("Error: no .strand file found. Run 'strand generate' first.");
+    console.error("Error: no .strand file found. Run 'strnd generate' first.");
     process.exit(1);
   }
 
@@ -301,7 +310,7 @@ async function runValidatePlan(
       `Warning: .strand is ${ageDays > 0 ? `${ageDays}d` : "<1d"} old and source files have changed since.`,
     );
     console.warn(
-      `Run 'strand generate' first for accurate churn and risk data.\n`,
+      `Run 'strnd generate' first for accurate churn and risk data.\n`,
     );
   }
 
@@ -498,7 +507,7 @@ async function runValidatePlan(
         console.log(`  \u26A0 ${w}`);
       }
       console.log(
-        `\n  Add [CHECKPOINT] steps after architectural changes: run \`strand update\`,`,
+        `\n  Add [CHECKPOINT] steps after architectural changes: run \`strnd update\`,`,
       );
       console.log(
         `  then use the Read tool or \`cat .strand\` to load fresh data into context.`,
@@ -511,7 +520,7 @@ async function runValidatePlan(
 
 async function runBatchCommand(configArg?: string, resume?: boolean) {
   if (!configArg) {
-    console.error("Usage: strand batch <config.json> [--resume]");
+    console.error("Usage: strnd batch <config.json> [--resume]");
     process.exit(1);
   }
 
@@ -523,7 +532,7 @@ async function runBatchCommand(configArg?: string, resume?: boolean) {
 
   if (!process.env["ANTHROPIC_API_KEY"]) {
     console.error("Error: ANTHROPIC_API_KEY environment variable is required");
-    console.error("  Set it: ANTHROPIC_API_KEY=sk-... strand batch <config>");
+    console.error("  Set it: ANTHROPIC_API_KEY=sk-... strnd batch <config>");
     process.exit(1);
   }
 
@@ -571,7 +580,7 @@ function handleError(command: string, err: unknown): never {
   console.error(`Error: ${command} failed unexpectedly`);
   if (err instanceof Error) console.error(err.message);
   console.error(
-    `\nPlease report this at https://github.com/joellopezjl96/strand/issues`,
+    `\nPlease report this at https://github.com/joellopezjl96/strnd/issues`,
   );
   process.exit(1);
 }
