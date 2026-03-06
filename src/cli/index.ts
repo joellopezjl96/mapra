@@ -15,6 +15,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { applyStrandSection, SUPERSESSION_MESSAGE, type StrandAction } from "./templates.js";
+import { installAllHooks, uninstallAllHooks } from "./hooks.js";
 
 const [, , command, ...args] = process.argv;
 
@@ -76,6 +77,22 @@ switch (command) {
     const configFile = args.find((a) => !a.startsWith("--"));
     const resume = args.includes("--resume");
     await runBatchCommand(configFile, resume);
+    break;
+  }
+  case "install-hooks": {
+    const targetPath = resolveTarget(args[0]);
+    const { installed, skipped } = installAllHooks(targetPath);
+    if (skipped) {
+      console.warn(`\u26A0 ${skipped} \u2014 skipping hook installation`);
+    } else {
+      for (const h of installed) console.log(`\u2713 Installed ${h} hook`);
+    }
+    break;
+  }
+  case "uninstall-hooks": {
+    const targetPath = resolveTarget(args[0]);
+    uninstallAllHooks(targetPath);
+    console.log("Removed strnd git hooks");
     break;
   }
   default:
