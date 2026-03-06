@@ -15,7 +15,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { applyStrandSection, SUPERSESSION_MESSAGE, type StrandAction } from "./templates.js";
-import { installAllHooks, uninstallAllHooks } from "./hooks.js";
+import { installAllHooks, uninstallAllHooks, getHooksDir, STRND_HOOK_START } from "./hooks.js";
 import { generateHookShim } from "./shim.js";
 
 const [, , command, ...args] = process.argv;
@@ -378,6 +378,31 @@ async function runStatus(targetArg?: string) {
         `  .gitignore    ⚠ .strand appears to be ignored — collaborators won't have the map`,
       );
     }
+  }
+
+  // Hook installation check
+  const hooksDir = getHooksDir(targetPath);
+  if (hooksDir) {
+    const postCommit = path.join(hooksDir, "post-commit");
+    if (fs.existsSync(postCommit)) {
+      const content = fs.readFileSync(postCommit, "utf-8");
+      const hasStrnd = content.includes(STRND_HOOK_START);
+      console.log(
+        `  git hooks     ${hasStrnd ? "\u2713 installed" : "\u2717 not installed (run 'strnd setup')"}`,
+      );
+    } else {
+      console.log(`  git hooks     \u2717 not installed (run 'strnd setup')`);
+    }
+  } else {
+    console.log(`  git hooks     \u2717 no .git directory`);
+  }
+
+  // .strnd/hook.mjs check
+  const shimPath = path.join(targetPath, ".strnd", "hook.mjs");
+  if (fs.existsSync(shimPath)) {
+    console.log(`  hook shim     \u2713 present`);
+  } else {
+    console.log(`  hook shim     \u2717 not found (run 'strnd setup')`);
   }
 
   console.log();
