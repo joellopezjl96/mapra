@@ -184,6 +184,40 @@ async function runSetup(targetArg?: string) {
     fs.writeFileSync(gitattrsPath, gitattrsEntry + "\n");
   }
 
+  // Step 7: Add prepare script and devDependency to package.json
+  const pkgJsonPath = path.join(targetPath, "package.json");
+  if (fs.existsSync(pkgJsonPath)) {
+    try {
+      const pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, "utf-8"));
+      let modified = false;
+
+      // Add prepare script
+      if (!pkgJson.scripts) pkgJson.scripts = {};
+      if (!pkgJson.scripts.prepare || !pkgJson.scripts.prepare.includes("strnd")) {
+        if (pkgJson.scripts.prepare) {
+          pkgJson.scripts.prepare += " && strnd install-hooks";
+        } else {
+          pkgJson.scripts.prepare = "strnd install-hooks";
+        }
+        modified = true;
+      }
+
+      // Add devDependency
+      if (!pkgJson.devDependencies) pkgJson.devDependencies = {};
+      if (!pkgJson.devDependencies.strnd) {
+        pkgJson.devDependencies.strnd = `^${version}`;
+        modified = true;
+      }
+
+      if (modified) {
+        fs.writeFileSync(pkgJsonPath, JSON.stringify(pkgJson, null, 2) + "\n");
+        console.log("Updated package.json (added strnd devDependency + prepare script)");
+      }
+    } catch {
+      console.warn("\u26A0 Could not update package.json \u2014 add strnd manually");
+    }
+  }
+
   console.log(
     "\nDone. Your codebase map will stay fresh automatically.",
   );
