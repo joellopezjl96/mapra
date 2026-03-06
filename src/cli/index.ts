@@ -111,17 +111,27 @@ Quick start:
   strnd update                 Regenerate .strand after codebase changes
 
 Commands:
-  setup [path]    Run generate then init (recommended for first-time setup)
+  setup [path]    Generate .strand, wire CLAUDE.md, install auto-update hooks
   generate [path] Scan codebase and write .strand to project root
   update [path]   Regenerate .strand in place (alias for generate in cwd)
   init [path]     Wire @.strand reference into project's CLAUDE.md
   status [path]   Show whether .strand is present, wired, and fresh
+  install-hooks [path]    Install git hooks for auto-update
+  uninstall-hooks [path]  Remove strnd git hooks
   validate-plan <plan.md> [--since YYYY-MM-DD] [--checkpoints]
                   Cross-reference plan file paths against .strand data
   batch <config.json> [--resume]
                   Run batch experiment comparing encoding conditions
 
+Flags:
+  --silent        Suppress output (used by git hooks)
+
   Default path: current working directory
+
+Auto-update:
+  After setup, .strand regenerates automatically on commit, merge, and
+  branch switch via git hooks. Teammates get hooks via npm install
+  (prepare script). Run 'strnd status' to check hook state.
 
 Examples:
   strnd setup                      # first-time setup in cwd
