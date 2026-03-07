@@ -13,6 +13,7 @@ import {
   verdictToScore,
   computeConditionStats,
   computeComparisons,
+  computeDiagnostics,
 } from "../analyzer.js";
 import type { QuestionResult, Verdict } from "../types.js";
 
@@ -216,5 +217,105 @@ describe("computeComparisons", () => {
     expect(comp.cliffsDelta).toBeGreaterThan(0);
     expect(["negligible", "small", "medium", "large"]).toContain(comp.cliffsMagnitude);
     expect(comp.winRate.total).toBe(2);
+  });
+});
+
+describe("computeDiagnostics", () => {
+  it("flags non-discriminating assertions (100% PASS all conditions)", () => {
+    const results = makeResults(); // q2 has PASS 100% both conditions
+    const diags = computeDiagnostics(results);
+
+    const nonDisc = diags.filter((d) => d.type === "non-discriminating");
+    expect(nonDisc.length).toBeGreaterThan(0);
+    expect(nonDisc.some((d) => d.questionId === "q2")).toBe(true);
+  });
+
+  it("flags flaky assertions (high CV within condition)", () => {
+    const results: QuestionResult[] = [
+      {
+        questionId: "flaky-q",
+        question: "test",
+        taskType: "planning",
+        codebaseName: "sbc",
+        conditions: [
+          {
+            conditionId: "full",
+            conditionName: "Full",
+            trials: [
+              {
+                trial: 1, response: "", tokens: { input: 100, output: 50 },
+                latencyMs: 1000,
+                scores: [{ assertion: "flaky check", verdict: "PASS", reasoning: "" }],
+              },
+              {
+                trial: 2, response: "", tokens: { input: 100, output: 50 },
+                latencyMs: 1000,
+                scores: [{ assertion: "flaky check", verdict: "FAIL", reasoning: "" }],
+              },
+              {
+                trial: 3, response: "", tokens: { input: 100, output: 50 },
+                latencyMs: 1000,
+                scores: [{ assertion: "flaky check", verdict: "PASS", reasoning: "" }],
+              },
+              {
+                trial: 4, response: "", tokens: { input: 100, output: 50 },
+                latencyMs: 1000,
+                scores: [{ assertion: "flaky check", verdict: "FAIL", reasoning: "" }],
+              },
+            ],
+            aggregateScore: 0.5,
+          },
+        ],
+      },
+    ];
+
+    const diags = computeDiagnostics(results);
+    const flaky = diags.filter((d) => d.type === "flaky");
+    expect(flaky.length).toBeGreaterThan(0);
+    expect(flaky[0]!.cv).toBeGreaterThan(0.3);
+  });
+
+  it("flags redundant assertion pairs (Spearman rho > 0.9)", () => {
+    const results: QuestionResult[] = [
+      {
+        questionId: "redundant-q",
+        question: "test",
+        taskType: "planning",
+        codebaseName: "sbc",
+        conditions: [
+          {
+            conditionId: "c1",
+            conditionName: "C1",
+            trials: [1, 2, 3].map((t) => ({
+              trial: t, response: "", tokens: { input: 100, output: 50 },
+              latencyMs: 1000,
+              scores: [
+                { assertion: "check A", verdict: "PASS" as Verdict, reasoning: "" },
+                { assertion: "check B", verdict: "PASS" as Verdict, reasoning: "" },
+              ],
+            })),
+            aggregateScore: 1.0,
+          },
+          {
+            conditionId: "c2",
+            conditionName: "C2",
+            trials: [1, 2, 3].map((t) => ({
+              trial: t, response: "", tokens: { input: 100, output: 50 },
+              latencyMs: 1000,
+              scores: [
+                { assertion: "check A", verdict: "FAIL" as Verdict, reasoning: "" },
+                { assertion: "check B", verdict: "FAIL" as Verdict, reasoning: "" },
+              ],
+            })),
+            aggregateScore: 0.0,
+          },
+        ],
+      },
+    ];
+
+    const diags = computeDiagnostics(results);
+    const redundant = diags.filter((d) => d.type === "redundant");
+    expect(redundant.length).toBeGreaterThan(0);
+    expect(redundant[0]!.pairedWith).toBeDefined();
   });
 });

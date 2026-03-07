@@ -191,3 +191,212 @@ function bootstrapCI(
   const hi = deltas[Math.floor((1 - alpha / 2) * iterations)]!;
   return [Math.round(lo * 100) / 100, Math.round(hi * 100) / 100];
 }
+
+// ─── Assertion diagnostics ───────────────────────────────
+
+export function computeDiagnostics(
+  results: QuestionResult[],
+): AssertionDiagnostic[] {
+  const diags: AssertionDiagnostic[] = [];
+
+  for (const qr of results) {
+    const assertionVerdicts = collectAssertionVerdicts(qr);
+
+    for (const [assertion, condVerdicts] of assertionVerdicts) {
+      checkNonDiscriminating(qr.questionId, assertion, condVerdicts, diags);
+      checkFlaky(qr.questionId, assertion, condVerdicts, diags);
+    }
+
+    checkRedundant(qr.questionId, assertionVerdicts, diags);
+    checkNegativeSignal(qr, diags);
+  }
+
+  return diags;
+}
+
+type CondVerdicts = Map<string, Verdict[]>;
+
+function collectAssertionVerdicts(
+  qr: QuestionResult,
+): Map<string, CondVerdicts> {
+  const map = new Map<string, CondVerdicts>();
+
+  for (const cr of qr.conditions) {
+    for (const trial of cr.trials) {
+      if (!trial.scores) continue;
+      for (const score of trial.scores) {
+        let condMap = map.get(score.assertion);
+        if (!condMap) {
+          condMap = new Map();
+          map.set(score.assertion, condMap);
+        }
+        let verdicts = condMap.get(cr.conditionId);
+        if (!verdicts) {
+          verdicts = [];
+          condMap.set(cr.conditionId, verdicts);
+        }
+        verdicts.push(score.verdict);
+      }
+    }
+  }
+
+  return map;
+}
+
+function checkNonDiscriminating(
+  questionId: string,
+  assertion: string,
+  condVerdicts: CondVerdicts,
+  diags: AssertionDiagnostic[],
+): void {
+  const passRates: Record<string, number> = {};
+  for (const [condId, verdicts] of condVerdicts) {
+    passRates[condId] = verdicts.filter((v) => v === "PASS").length / verdicts.length;
+  }
+
+  const rates = Object.values(passRates);
+  if (rates.length < 2) return;
+
+  const maxDiff = Math.max(...rates) - Math.min(...rates);
+  if (maxDiff < 0.05) {
+    const avgRate = rates.reduce((a, b) => a + b, 0) / rates.length;
+    const label = avgRate > 0.95 ? "PASS" : avgRate < 0.05 ? "FAIL" : `${(avgRate * 100).toFixed(0)}%`;
+    diags.push({
+      type: "non-discriminating",
+      questionId,
+      assertion,
+      detail: `${label} across all conditions (max diff ${(maxDiff * 100).toFixed(1)}%)`,
+      passRates,
+    });
+  }
+}
+
+function checkFlaky(
+  questionId: string,
+  assertion: string,
+  condVerdicts: CondVerdicts,
+  diags: AssertionDiagnostic[],
+): void {
+  for (const [condId, verdicts] of condVerdicts) {
+    if (verdicts.length < 3) continue;
+    const scores = verdicts.map(verdictToScore);
+    const cv = computeCV(scores);
+    if (cv > 0.3) {
+      diags.push({
+        type: "flaky",
+        questionId,
+        assertion,
+        detail: `CV=${cv.toFixed(2)} in condition ${condId} (trials: ${scores.join(", ")})`,
+        trialScores: scores,
+        cv,
+      });
+      break; // Only flag once per assertion
+    }
+  }
+}
+
+function computeCV(values: number[]): number {
+  const mean = values.reduce((a, b) => a + b, 0) / values.length;
+  if (mean === 0) return values.some((v) => v !== 0) ? Infinity : 0;
+  return computeStddev(values) / mean;
+}
+
+function checkRedundant(
+  questionId: string,
+  assertionVerdicts: Map<string, CondVerdicts>,
+  diags: AssertionDiagnostic[],
+): void {
+  const assertions = [...assertionVerdicts.keys()];
+  if (assertions.length < 2) return;
+
+  const vectors = new Map<string, number[]>();
+  for (const [assertion, condMap] of assertionVerdicts) {
+    const vec: number[] = [];
+    for (const [, verdicts] of [...condMap.entries()].sort()) {
+      for (const v of verdicts) vec.push(verdictToScore(v));
+    }
+    vectors.set(assertion, vec);
+  }
+
+  const flagged = new Set<string>();
+  for (let i = 0; i < assertions.length; i++) {
+    for (let j = i + 1; j < assertions.length; j++) {
+      const a = assertions[i]!;
+      const b = assertions[j]!;
+      if (flagged.has(a) || flagged.has(b)) continue;
+
+      const vecA = vectors.get(a)!;
+      const vecB = vectors.get(b)!;
+      const rho = spearmanCorrelation(vecA, vecB);
+
+      if (Math.abs(rho) > 0.9) {
+        flagged.add(b);
+        diags.push({
+          type: "redundant",
+          questionId,
+          assertion: b,
+          detail: `Spearman rho=${rho.toFixed(2)} with "${a}"`,
+          pairedWith: a,
+          correlation: rho,
+        });
+      }
+    }
+  }
+}
+
+function spearmanCorrelation(a: number[], b: number[]): number {
+  const n = Math.min(a.length, b.length);
+  if (n < 3) return 0;
+
+  const rankA = toRanks(a.slice(0, n));
+  const rankB = toRanks(b.slice(0, n));
+
+  let sumD2 = 0;
+  for (let i = 0; i < n; i++) {
+    const d = rankA[i]! - rankB[i]!;
+    sumD2 += d * d;
+  }
+
+  return 1 - (6 * sumD2) / (n * (n * n - 1));
+}
+
+function toRanks(values: number[]): number[] {
+  const indexed = values.map((v, i) => ({ v, i }));
+  indexed.sort((a, b) => a.v - b.v);
+  const ranks = new Array<number>(values.length);
+  for (let i = 0; i < indexed.length; ) {
+    let j = i;
+    while (j < indexed.length && indexed[j]!.v === indexed[i]!.v) j++;
+    const avgRank = (i + j - 1) / 2 + 1;
+    for (let k = i; k < j; k++) ranks[indexed[k]!.i] = avgRank;
+    i = j;
+  }
+  return ranks;
+}
+
+function checkNegativeSignal(
+  qr: QuestionResult,
+  diags: AssertionDiagnostic[],
+): void {
+  const sorted = [...qr.conditions].sort((a, b) => b.aggregateScore - a.aggregateScore);
+  if (sorted.length < 2) return;
+
+  for (let i = 0; i < sorted.length; i++) {
+    for (let j = i + 1; j < sorted.length; j++) {
+      const better = sorted[i]!;
+      const worse = sorted[j]!;
+      if (
+        worse.conditionName.toLowerCase().includes("full") &&
+        !better.conditionName.toLowerCase().includes("full") &&
+        better.aggregateScore - worse.aggregateScore > 0.05
+      ) {
+        diags.push({
+          type: "negative-signal",
+          questionId: qr.questionId,
+          assertion: `${worse.conditionName} vs ${better.conditionName}`,
+          detail: `"${worse.conditionName}" (${worse.aggregateScore.toFixed(2)}) scores lower than "${better.conditionName}" (${better.aggregateScore.toFixed(2)})`,
+        });
+      }
+    }
+  }
+}
