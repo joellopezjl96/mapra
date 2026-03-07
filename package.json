@@ -1,11 +1,14 @@
 {
-  "name": "strand",
+  "name": "strnd",
   "version": "0.1.0",
   "description": "Codebase intelligence for AI agents — stop exploring, start building",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/joellopezjl96/strnd"
+  },
   "type": "module",
-  "main": "dist/index.js",
   "bin": {
-    "strand": "dist/cli/index.js"
+    "strnd": "dist/cli/index.js"
   },
   "scripts": {
     "build": "tsc",
@@ -18,7 +21,10 @@
   },
   "files": [
     "dist/",
-    "README.md"
+    "!dist/**/__tests__/",
+    "!dist/batch/",
+    "README.md",
+    "LICENSE"
   ],
   "engines": {
     "node": ">=18"
@@ -26,24 +32,21 @@
   "keywords": [
     "ai",
     "codebase",
-    "visual-encoding",
     "llm",
     "developer-tools",
     "claude",
     "claude-code",
-    "context-window"
+    "context-window",
+    "static-analysis",
+    "blast-radius"
   ],
   "author": "Joel Lopez Berrum",
   "license": "MIT",
-  "dependencies": {
-    "typescript": "^5.9.3"
-  },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
     "@types/node": "^25.3.2",
-    "tree-sitter": "^0.21.1",
-    "tree-sitter-typescript": "^0.23.2",
     "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
     "vitest": "^4.0.18"
   }
 }
