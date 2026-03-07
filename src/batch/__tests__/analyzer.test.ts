@@ -11,7 +11,10 @@ import {
   cliffsMagnitude,
   computeWinRate,
   verdictToScore,
+  computeConditionStats,
+  computeComparisons,
 } from "../analyzer.js";
+import type { QuestionResult, Verdict } from "../types.js";
 
 describe("analysis types", () => {
   it("ConditionStats has mean, stddev, min, max", () => {
@@ -105,5 +108,113 @@ describe("computeWinRate", () => {
       [0.5, 0.5, 0.7],
     );
     expect(result).toEqual({ wins: 2, losses: 0, ties: 1, total: 3 });
+  });
+});
+
+// Reusable fixture: 2 questions, 2 conditions, 3 trials each
+function makeResults(): QuestionResult[] {
+  function trial(scores: Verdict[], trialNum: number) {
+    return {
+      trial: trialNum,
+      response: "test",
+      tokens: { input: 4000, output: 500 },
+      latencyMs: 20000,
+      scores: scores.map((v) => ({
+        assertion: "test assertion",
+        verdict: v,
+        reasoning: "test",
+      })),
+    };
+  }
+
+  return [
+    {
+      questionId: "q1",
+      question: "test q1",
+      taskType: "planning",
+      codebaseName: "sbc",
+      conditions: [
+        {
+          conditionId: "full",
+          conditionName: "Strand full",
+          trials: [
+            trial(["PASS", "PASS"], 1),
+            trial(["PASS", "PARTIAL"], 2),
+            trial(["PASS", "PASS"], 3),
+          ],
+          aggregateScore: 0.92,
+        },
+        {
+          conditionId: "lite",
+          conditionName: "Strand lite",
+          trials: [
+            trial(["PARTIAL", "FAIL"], 1),
+            trial(["PASS", "FAIL"], 2),
+            trial(["FAIL", "FAIL"], 3),
+          ],
+          aggregateScore: 0.33,
+        },
+      ],
+    },
+    {
+      questionId: "q2",
+      question: "test q2",
+      taskType: "debugging",
+      codebaseName: "sbc",
+      conditions: [
+        {
+          conditionId: "full",
+          conditionName: "Strand full",
+          trials: [
+            trial(["PASS", "PASS"], 1),
+            trial(["PASS", "PASS"], 2),
+            trial(["PASS", "PASS"], 3),
+          ],
+          aggregateScore: 1.0,
+        },
+        {
+          conditionId: "lite",
+          conditionName: "Strand lite",
+          trials: [
+            trial(["PASS", "PASS"], 1),
+            trial(["PASS", "PASS"], 2),
+            trial(["PASS", "PASS"], 3),
+          ],
+          aggregateScore: 1.0,
+        },
+      ],
+    },
+  ];
+}
+
+describe("computeConditionStats", () => {
+  it("computes mean, stddev, min, max, verdict distribution", () => {
+    const stats = computeConditionStats(makeResults());
+
+    const full = stats.find((s) => s.conditionId === "full")!;
+    expect(full.mean).toBeGreaterThan(0.9);
+    expect(full.stddev).toBeGreaterThanOrEqual(0);
+    expect(full.min).toBeLessThanOrEqual(full.mean);
+    expect(full.max).toBeGreaterThanOrEqual(full.mean);
+    expect(full.verdictDistribution.PASS).toBeGreaterThan(0);
+    expect(
+      full.verdictDistribution.PASS +
+      full.verdictDistribution.PARTIAL +
+      full.verdictDistribution.FAIL,
+    ).toBeCloseTo(1.0, 2);
+  });
+});
+
+describe("computeComparisons", () => {
+  it("produces pairwise comparisons with Cliff's Delta", () => {
+    const comps = computeComparisons(makeResults());
+
+    expect(comps.length).toBe(1); // 2 conditions -> 1 pair
+    const comp = comps[0]!;
+    expect(comp.conditionA).toBe("full");
+    expect(comp.conditionB).toBe("lite");
+    expect(comp.cliffsDelta).toBeGreaterThan(0);
+    expect(["negligible", "small", "medium", "large"]).toContain(comp.cliffsMagnitude);
+    expect(comp.winRate.total).toBe(2);
   });
 });
