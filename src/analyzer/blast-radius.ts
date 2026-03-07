@@ -5,7 +5,7 @@
  * affected files. Signal attenuation (0.7^depth) weights nearby files higher.
  */
 
-import { bfs, countDistinctModules } from "./graph-utils.js";
+import { bfs, getModuleId } from "./graph-utils.js";
 
 export interface BlastResult {
   nodeId: string;
@@ -13,6 +13,7 @@ export interface BlastResult {
   affectedCount: number; // transitive BFS reach (excluding test edges)
   weightedImpact: number; // sum of 0.7^depth for each affected file
   modulesAffected: number; // distinct modules in blast radius
+  affectedModuleNames: string[]; // names of affected modules
   maxDepth: number; // how far the cascade reaches
   amplificationRatio: number; // affectedCount / directImporters
 }
@@ -41,7 +42,12 @@ export function computeBlastRadius(
     if (depth > maxDepth) maxDepth = depth;
   }
 
-  const modulesAffected = countDistinctModules(depths.keys());
+  const affectedModuleSet = new Set<string>();
+  for (const id of depths.keys()) {
+    affectedModuleSet.add(getModuleId(id));
+  }
+  const modulesAffected = affectedModuleSet.size;
+  const affectedModuleNames = [...affectedModuleSet].sort();
 
   const amplificationRatio =
     directImporters > 0 ? affectedCount / directImporters : 0;
@@ -52,6 +58,7 @@ export function computeBlastRadius(
     affectedCount,
     weightedImpact: Math.round(weightedImpact * 100) / 100,
     modulesAffected,
+    affectedModuleNames,
     maxDepth,
     amplificationRatio: Math.round(amplificationRatio * 10) / 10,
   };

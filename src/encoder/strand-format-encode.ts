@@ -143,6 +143,17 @@ function renderRisk(graph: StrandGraph, analysis: GraphAnalysis): string {
 
     out += `${marker} ${amp} ${flow} ${depth} ${mods} ${tests} ${r.nodeId}\n`;
 
+    // Cascade targets — which modules get hit
+    if (r.affectedModuleNames && r.affectedModuleNames.length > 0) {
+      const sourceModule = getModuleId(r.nodeId);
+      const otherModules = r.affectedModuleNames.filter(m => m !== sourceModule);
+      if (otherModules.length > 0) {
+        const shown = otherModules.slice(0, 5);
+        const suffix = otherModules.length > 5 ? `, +${otherModules.length - 5} more` : "";
+        out += `  cascades to: ${shown.join(", ")}${suffix}\n`;
+      }
+    }
+
     // Export symbols (max 5, skip if empty)
     const node = nodeMap.get(r.nodeId);
     const exports = node?.exports?.filter((e) => e !== "default") ?? [];
@@ -562,7 +573,16 @@ function renderFlowsFromHubs(
 
 function renderDeadCode(analysis: GraphAnalysis): string {
   if (!analysis.deadCode || analysis.deadCode.length === 0) return "";
-  return `─── DEAD CODE: ${analysis.deadCode.length} unreachable files ─────────────────\n`;
+  const total = analysis.deadCode.length;
+  let out = `─── DEAD CODE (${total} unreachable files) ─────────────────\n`;
+  const shown = analysis.deadCode.slice(0, 15);
+  for (const file of shown) {
+    out += `${file}\n`;
+  }
+  if (total > shown.length) {
+    out += `+${total - shown.length} more\n`;
+  }
+  return out;
 }
 
 // ─── Helpers ────────────────────────────────────────────

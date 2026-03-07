@@ -72,6 +72,7 @@ function makeAnalysis(): GraphAnalysis {
         affectedCount: 1,
         weightedImpact: 0.7,
         modulesAffected: 1,
+        affectedModuleNames: ["src/app"],
         maxDepth: 1,
         amplificationRatio: 1.0,
       },

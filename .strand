@@ -1,18 +1,18 @@
-STRAND v3 | strand | Typescript | 76 files | 12,600 lines | generated 2026-03-07T05:13:06
+STRAND v3 | strand | Typescript | 76 files | 12,629 lines | generated 2026-03-07T05:21:49
 LEGEND: ×N=imported by N files | ═/·=coupling strong/weak | ×A→B=A direct, B total affected | dN=cascade depth | [AMP]=amplification≥2x | TN=N test files | NL=lines of code
 USAGE: planning→RISK,CONVENTIONS,INFRASTRUCTURE | debugging→FLOWS,CHURN,HOTSPOTS | refactoring→RISK,CHURN | review→CONVENTIONS,RISK,CHURN | impact-analysis→RISK,INFRASTRUCTURE
 
 ─── CHURN (last 30 days, top movers) ─────────────────────
 26 commits   +960 -137    src/cli/index.ts  "fix: address code review issues (I-1 through I-6)"
-17 commits   +808 -97     src/encoder/strand-format-encode.ts  "feat: add batch experiment runner for automated..."
-12 commits   +1192 -15    FINDINGS.md  "docs: add Exp 12 change-safety findings + Exp 1..."
+18 commits   +810 -227    src/encoder/strand-format-encode.ts  "feat(encoder): remove TERRAIN and DOMAINS secti..."
+13 commits   +1323 -17    FINDINGS.md  "feat(encoder): remove TERRAIN and DOMAINS secti..."
 8 commits    +75 -23      package.json  "chore: remove dead tree-sitter dependencies (sc..."
+7 commits    +141 -105    .strand  "feat(encoder): remove TERRAIN and DOMAINS secti..."
 7 commits    +180 -0      src/cli/__tests__/templates.test.ts  "feat(cli): add freshness carve-out to CLAUDE_MD..."
 7 commits    +636 -22     src/scanner/index.ts  "fix(q1): fix detectDomain() fallback + add DOMA..."
 6 commits    +585 -43     src/batch/runner.ts  "feat(batch): auto-print analysis report after b..."
 6 commits    +652 -9      src/batch/analyzer.ts  "fix: address code review issues (I-1 through I-6)"
 6 commits    +192 -5      src/batch/types.ts  "fix: address code review issues (I-1 through I-6)"
-6 commits    +407 -2      src/batch/__tests__/analyzer.test.ts  "feat(batch): add cross-iteration comparison"
 
 ─── HOTSPOTS (complexity > 0.3) ─────────────────────────
 0.79  src/batch/runner.ts                                   543L 13imp 
@@ -23,7 +23,7 @@ USAGE: planning→RISK,CONVENTIONS,INFRASTRUCTURE | debugging→FLOWS,CHURN,HOTS
 0.57  experiments/experiment-5-generalization.ts            446L  8imp 
 0.55  experiments/experiment-8-comprehension.ts             465L  7imp 
 0.54  experiments/experiment-4-strand-v2.ts                 406L  8imp 
-0.51  src/encoder/strand-format-encode.ts                   584L  3imp 
+0.53  src/encoder/strand-format-encode.ts                   604L  3imp 
 0.50  src/scanner/index.ts                                  615L  2imp 
 
 ─── INFRASTRUCTURE ──────────────────────────────────────
@@ -32,4 +32,20 @@ Inter-module dependency roads
 
 ─── TEST COVERAGE ───────────────────────────────────────
 18 test files | 0/57 testable files with direct test edges (0.0%)
-─── DEAD CODE: 57 unreachable files ─────────────────
+─── DEAD CODE (57 unreachable files) ─────────────────
+experiments/archive/experiment-3-formats.ts
+experiments/archive/visual-vs-text.ts
+experiments/experiment-4-strand-v2.d.ts
+experiments/experiment-4-strand-v2.js
+experiments/experiment-4-strand-v2.ts
+experiments/experiment-5-generalization.d.ts
+experiments/experiment-5-generalization.js
+experiments/experiment-5-generalization.ts
+experiments/experiment-6-model-tiers.ts
+experiments/experiment-8-comprehension.ts
+experiments/validate-blast-radius.d.ts
+experiments/validate-blast-radius.js
+experiments/validate-blast-radius.ts
+scripts/generate-strand.d.ts
+scripts/generate-strand.js
++42 more
