@@ -97,6 +97,21 @@
           "check": "Response mentions cross-module dependency roads or coupling strength"
         }
       ]
+    },
+    {
+      "id": "route-change-safety-1",
+      "question": "Which file in this codebase is most dangerous to modify — specifically one that looks safe based on import count but has hidden cascade effects?",
+      "taskType": "change-safety",
+      "assertions": [
+        {
+          "description": "References RISK section data",
+          "check": "Response references amplification ratio, cascade depth, or affected file counts (RISK section data)"
+        },
+        {
+          "description": "Names a hidden amplifier",
+          "check": "Response names ordering-server.ts, TlcEmailLayout.tsx, or emails/constants.ts as a hidden high-risk file"
+        }
+      ]
     }
   ],
   "trials": 3,

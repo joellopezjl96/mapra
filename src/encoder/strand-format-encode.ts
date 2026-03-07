@@ -22,8 +22,8 @@ export function encodeToStrandFormat(graph: StrandGraph, analysis?: GraphAnalysi
   // Header
   const generated = new Date().toISOString().slice(0, 19);
   out += `STRAND v3 | ${graph.projectName} | ${capitalize(graph.framework)} | ${graph.totalFiles} files | ${graph.totalLines.toLocaleString()} lines | generated ${generated}\n`;
-  out += `LEGEND: ×N=imported by N files | █▓░·=complexity high→low | ═/·=coupling strong/weak | ×A→B=A direct, B total affected | dN=cascade depth | [AMP]=amplification≥2x | TN=N test files | NL=lines of code\n`;
-  out += `USAGE: planning→RISK,CONVENTIONS,INFRASTRUCTURE | debugging→FLOWS,CHURN,HOTSPOTS | refactoring→RISK,DOMAINS,CHURN | review→CONVENTIONS,RISK,CHURN | impact-analysis→RISK,INFRASTRUCTURE\n\n`;
+  out += `LEGEND: ×N=imported by N files | ═/·=coupling strong/weak | ×A→B=A direct, B total affected | dN=cascade depth | [AMP]=amplification≥2x | TN=N test files | NL=lines of code\n`;
+  out += `USAGE: planning→RISK,CONVENTIONS,INFRASTRUCTURE | debugging→FLOWS,CHURN,HOTSPOTS | refactoring→RISK,CHURN | review→CONVENTIONS,RISK,CHURN | impact-analysis→RISK,INFRASTRUCTURE\n\n`;
 
   // RISK first — highest signal for change-impact questions
   if (analysis) {
@@ -47,12 +47,6 @@ export function encodeToStrandFormat(graph: StrandGraph, analysis?: GraphAnalysi
   out += renderHotspots(graph);
   out += renderMostImported(graph);
 
-  // DOMAINS — semantic feature domain inventory
-  out += renderDomains(graph);
-
-  // TERRAIN — orientation heatmap
-  out += renderTerrain(graph);
-
   // INFRASTRUCTURE — inter-module topology
   out += renderInfrastructure(graph);
 
@@ -68,74 +62,6 @@ export function encodeToStrandFormat(graph: StrandGraph, analysis?: GraphAnalysi
     out += renderDeadCode(analysis);
   }
 
-  return out;
-}
-
-function renderDomains(graph: StrandGraph): string {
-  const counts = new Map<string, number>();
-  for (const node of graph.nodes) {
-    const d = node.domain ?? "unknown";
-    counts.set(d, (counts.get(d) ?? 0) + 1);
-  }
-
-  // Drop generic filesystem buckets that aren't domains
-  const EXCLUDE = new Set(["pages", "hooks", "components", "lib", "utils", "types",
-                            "config", "layouts", "views", "helpers", "context"]);
-
-  const domains = [...counts.entries()]
-    .filter(([name]) => !EXCLUDE.has(name))
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 24);
-
-  if (domains.length === 0) return "";
-
-  const lines = ["─── DOMAINS " + "─".repeat(40), "Feature domains by file count\n"];
-  for (const [name, count] of domains) {
-    lines.push(`${name.padEnd(28)} ${String(count).padStart(4)} files`);
-  }
-  lines.push("");
-  return lines.join("\n") + "\n";
-}
-
-function renderTerrain(graph: StrandGraph): string {
-  let out = `─── TERRAIN ─────────────────────────────────────────────\n`;
-  out += `Module complexity heatmap (█=high ▓=mid ░=low ·=minimal)\n\n`;
-
-  // Sort modules by total lines (most significant first)
-  const modules = graph.modules
-    .filter((m) => m.nodeCount > 0)
-    .sort((a, b) => b.totalLines - a.totalLines);
-
-  // Calculate avg complexity per module
-  const moduleComplexities = new Map<string, number>();
-  for (const mod of modules) {
-    const modNodes = graph.nodes.filter((n) => {
-      const parts = n.path.split("/");
-      const key = parts.length > 2 ? parts.slice(0, 2).join("/") : parts[0];
-      return key === mod.id;
-    });
-    const avg =
-      modNodes.length > 0
-        ? modNodes.reduce((sum, n) => sum + n.complexity, 0) / modNodes.length
-        : 0;
-    moduleComplexities.set(mod.id, avg);
-  }
-
-  const BAR_WIDTH = 10;
-  for (const mod of modules) {
-    const complexity = moduleComplexities.get(mod.id) ?? 0;
-    const bar = complexityBar(complexity, BAR_WIDTH);
-    const name = mod.name.padEnd(14);
-    const cStr = complexity.toFixed(2);
-    const files = `${mod.nodeCount} files`.padStart(9);
-    const lines = `${mod.totalLines.toLocaleString()}L`.padStart(8);
-
-    // Brief description based on path
-    const desc = moduleDescription(mod.path, graph);
-    out += `${bar}  ${name} ${cStr} ${files} ${lines}  ${desc}\n`;
-  }
-
-  out += `\n`;
   return out;
 }
 
@@ -641,34 +567,6 @@ function renderDeadCode(analysis: GraphAnalysis): string {
 
 // ─── Helpers ────────────────────────────────────────────
 
-/**
- * Generate a 10-char complexity bar using Unicode block chars.
- * █ = high (0.7-1.0), ▓ = mid (0.4-0.7), ░ = low (0.15-0.4), · = minimal (0-0.15)
- */
-function complexityBar(complexity: number, width: number): string {
-  const filled = Math.round(complexity * width);
-  let bar = "";
-
-  for (let i = 0; i < width; i++) {
-    if (i < filled) {
-      // Determine char based on position relative to complexity
-      const posRatio = (i + 1) / width;
-      if (posRatio <= complexity * 0.5) bar += "█";
-      else if (posRatio <= complexity * 0.75) bar += "▓";
-      else bar += "░";
-    } else {
-      bar += "·";
-    }
-  }
-
-  // Ensure at least the first char reflects the minimum complexity
-  if (complexity > 0.01 && filled === 0) {
-    bar = "·" + bar.slice(1);
-  }
-
-  return bar;
-}
-
 function classifyEdge(fromPath: string, toPath: string): string {
   const combined = fromPath + " " + toPath;
   if (/auth|session|login|magic-link|trusted-device|verify/.test(combined))
@@ -683,29 +581,3 @@ function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-/**
- * Compute a module description from the 3 most-imported file names within it.
- * Always correct because it derives from the actual graph, not from path guessing.
- */
-function moduleDescription(modPath: string, graph: StrandGraph): string {
-  // Count inbound edges for files within this module
-  const inboundCounts = new Map<string, number>();
-  for (const edge of graph.edges) {
-    if (edge.to.startsWith(modPath + "/") || edge.to === modPath) {
-      inboundCounts.set(edge.to, (inboundCounts.get(edge.to) || 0) + 1);
-    }
-  }
-
-  if (inboundCounts.size === 0) return "";
-
-  // Take top 3 by inbound count, use basename without extension
-  const top3 = [...inboundCounts.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3)
-    .map(([filePath]) => {
-      const base = filePath.split("/").pop() ?? filePath;
-      return base.replace(/\.(ts|tsx|js|jsx)$/, "");
-    });
-
-  return top3.join(", ");
-}

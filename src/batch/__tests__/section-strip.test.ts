@@ -96,8 +96,6 @@ describe("section stripping", () => {
 
     // Other sections should remain
     expect(stripped).toContain("─── HOTSPOTS");
-    expect(stripped).toContain("─── DOMAINS");
-    expect(stripped).toContain("─── TERRAIN");
     expect(stripped).toContain("─── TEST COVERAGE");
   });
 

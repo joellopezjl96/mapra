@@ -1,8 +1,8 @@
-# Strand Experiment Findings
+# Strnd Experiment Findings
 
 Research log tracking what we've learned about encoding codebases for LLM consumption.
 
-**Project:** Strand — stop exploring, start building
+**Project:** Strnd — stop exploring, start building
 **Target codebase:** SenorBurritoCompany (Next.js 14, 289 files, 49,966 lines, 27 modules)
 **Model:** claude-sonnet-4-20250514 (1024 max tokens)
 **5 standard questions:** inventory (Q1), analysis (Q2), navigation (Q3), architecture (Q4), dependency (Q5)
@@ -1175,3 +1175,132 @@ Why does RISK work so well on ranking tasks (change-4) but less on identificatio
 - **RISK's value is proportional to the gap between direct imports and total affected.** Files where amp ≈ 1.0 (like session.ts) don't benefit from RISK. Files where amp ≥ 2.0 (ordering-server.ts at 3.6) are where RISK provides unique, otherwise-unavailable signal.
 - **Confirms Exp 11's directional finding.** Exp 11 found RISK was the only section with detectable task-specific signal (architecture -14 points). Exp 12 independently confirms RISK carries unique value, now on a dedicated change-safety task type with properly functioning `excludeSections`.
 - **Consider RISK-targeted prompting.** The USAGE line could route change-safety tasks to "read RISK first" — this may further improve hidden amplifier identification (change-3).
+
+---
+
+## Experiment 13: USAGE Line Routing
+
+**Date:** 2026-03-05
+**Config:** `experiments/configs/usage-line-routing.json`
+**Results:** `experiments/experiments/output/usage-line-routing-results.json`
+**Report:** `experiments/experiments/output/usage-line-routing-summary.md`
+
+### Hypothesis
+
+The USAGE line (`USAGE: planning→RISK,CONVENTIONS,INFRASTRUCTURE | debugging→FLOWS,CHURN,HOTSPOTS | ...`) helps models route to the right sections for each task type, improving section-specific data usage.
+
+### Setup
+
+- **Scale:** 2 conditions × 6 questions × 3 trials = 36 API calls
+- **Cost:** ~$0.91
+- **Model:** claude-sonnet-4-6 (trial), claude-haiku-4-5-20251001 (judge)
+- **Questions:** 6 across 6 task types (planning, debugging, refactoring, review, impact, change-safety)
+
+### Conditions
+
+| # | Condition | Tokens (avg) |
+|---|-----------|-------------|
+| 1 | Strand v3 (no USAGE) | 4,595 |
+| 2 | Strand v3 + USAGE | 4,659 |
+
+### Overall Scores
+
+| Condition | Avg Score |
+|-----------|-----------|
+| Strand v3 (no USAGE) | 0.75 |
+| Strand v3 + USAGE | **0.82** |
+
+### Scores by Task Type
+
+| Task Type | No USAGE | + USAGE | Δ |
+|-----------|----------|---------|---|
+| change-safety | 0.50 | **1.00** | **+0.50** |
+| debugging | 1.00 | 1.00 | 0.00 |
+| impact | 1.00 | 1.00 | 0.00 |
+| planning | 0.94 | 0.83 | -0.11 |
+| refactoring | 0.33 | 0.50 | +0.17 |
+| review | 0.75 | 0.58 | -0.17 |
+
+### Key Findings
+
+1. **USAGE line's biggest win is change-safety (+0.50).** Without USAGE, the model scored 0.50 on identifying hidden amplifiers — it named `ordering.ts` (high imports, obvious) instead of `ordering-server.ts` (hidden cascade). With USAGE routing to RISK, all 3 trials correctly identified `ordering-server.ts` with AMP 3.6× data.
+
+2. **USAGE slightly hurts planning (-0.11) and review (-0.17).** On planning, the model with USAGE sometimes missed CONVENTIONS data. On review, it focused narrowly on RISK-referenced sections and missed broader convention patterns. The routing may over-constrain the model's attention.
+
+3. **Refactoring improved (+0.17) but remains weak.** USAGE helped the model find TlcEmailLayout's blast radius (AMP 3.0-5.0) for refactoring, but domain boundary reasoning remained partial.
+
+4. **Debugging and impact already at ceiling (1.00).** The USAGE line adds nothing for tasks where the model already knows where to look.
+
+### Verdict
+
+**Keep the USAGE line.** The +0.50 on change-safety (strand's moat) outweighs the minor regressions on planning and review. The USAGE line's value is specifically for routing attention to RISK data on change-safety tasks — exactly the scenario where strand provides unique value.
+
+---
+
+## Experiment 14: Trim Validation (TERRAIN + DOMAINS removal)
+
+**Date:** 2026-03-07
+**Config:** `experiments/configs/trim-validation.json`
+**Results:** `experiments/experiments/output/trim-validation-results.json`
+**Report:** `experiments/experiments/output/trim-validation-summary.md`
+
+### Hypothesis
+
+TERRAIN and DOMAINS sections can be removed without hurting performance, saving ~850 tokens. These sections showed no measurable value in prior experiments (Exp 11 directional, Exp 9-10 indirect) and the model compensates using HOTSPOTS, CHURN, and RISK data.
+
+### Setup
+
+- **Scale:** 3 conditions × 7 questions × 3 trials = 63 trial + 63 judge = 126 API calls
+- **Cost:** $1.31
+- **Model:** claude-sonnet-4-6 (trial), claude-haiku-4-5-20251001 (judge)
+- **Questions:** 4 section-targeted (2 terrain, 1 pages, 1 domains) + 3 regression checks (debug, impact, planning)
+- **Codebase:** SenorBurritoCompany (301 files, 53,099 lines)
+
+### Conditions
+
+| # | Condition | Encoding | Tokens (avg) | Savings |
+|---|-----------|----------|-------------|---------|
+| 1 | Full v3 (baseline) | All sections | 4,611 | — |
+| 2 | No TERRAIN | TERRAIN removed | 3,949 | -14% |
+| 3 | Trimmed (no PAGES, TERRAIN, DOMAINS) | Three sections removed | 3,158 | -32% |
+
+### Overall Scores
+
+| Condition | Avg Score | Δ vs Baseline |
+|-----------|-----------|---------------|
+| Full v3 (baseline) | **1.00** | — |
+| No TERRAIN | **1.00** | 0.00 |
+| Trimmed | 0.90 | -0.10 |
+
+### Scores by Task Type
+
+| Task Type | Baseline | No TERRAIN | Trimmed |
+|-----------|----------|------------|---------|
+| architecture | 1.00 | 1.00 | 1.00 |
+| debugging | 1.00 | 1.00 | 1.00 |
+| impact | 1.00 | 1.00 | 1.00 |
+| inventory | 1.00 | 1.00 | **0.67** |
+| planning | 1.00 | 1.00 | 1.00 |
+
+### Key Findings
+
+1. **TERRAIN is safe to remove (zero regression).** No TERRAIN scored 1.00 on every question — including the two terrain-targeted questions that directly asked about module complexity distribution. The model compensated perfectly using HOTSPOTS and CHURN data. Saves ~662 tokens (14%).
+
+2. **DOMAINS is safe to remove.** The trimmed condition scored 1.00 on the domains-targeted question (domains-1). Without the DOMAINS section, the model identified 5 feature domains with relative sizes — inferred from file paths and module structure in other sections.
+
+3. **PAGES carries signal for page-listing tasks.** The only regression: pages-1 dropped from 1.00 → 0.33 in the trimmed condition. Without PAGES, the model conflated API routes with user-facing pages, listing auth endpoints instead of menu/orders/profile pages. The PAGES section costs ~582 tokens but provides data that cannot be reconstructed from other sections.
+
+4. **All regression checks passed perfectly.** Debugging (order flow tracing), impact (ordering-server.ts blast radius), and planning (DataCandy integration) scored 1.00 across all conditions. Removing TERRAIN and DOMAINS causes zero regression on real-world tasks.
+
+5. **Token savings are significant.** Removing TERRAIN + DOMAINS saves ~850 tokens per encoding with zero measured regression on 6 of 7 task types.
+
+### Action Taken
+
+Based on these results, TERRAIN and DOMAINS were removed from the v3 encoder:
+- `renderTerrain()` and `renderDomains()` removed from `strand-format-encode.ts`
+- LEGEND updated (removed `█▓░·=complexity high→low`)
+- USAGE line updated (removed DOMAINS from refactoring route)
+- PAGES section retained (carries unique signal for inventory tasks)
+- Helper functions `complexityBar()` and `moduleDescription()` removed (dead code after TERRAIN removal)
+
+**Result:** .strand encoding for SenorBurritoCompany dropped from ~3,539 tokens to ~2,326 tokens (-34%). The strand project's own .strand dropped to 643 tokens.
