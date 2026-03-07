@@ -255,7 +255,7 @@ function walkDir(
 }
 
 function isSourceFile(name: string): boolean {
-  return /\.(ts|tsx|js|jsx|mjs|cjs|py|rs|go|java|rb|prisma)$/.test(name);
+  return /\.(ts|tsx|js|jsx|mjs|cjs|prisma)$/.test(name);
 }
 
 function classifyFile(

@@ -28,7 +28,7 @@ header line to identify which is newest.
 @.strand
 `;
 
-/** Message printed to stdout after strand update to signal context supersession. */
+/** Message printed to stdout after strnd update to signal context supersession. */
 export function SUPERSESSION_MESSAGE(isoTimestamp: string): string {
   return `.strand regenerated (${isoTimestamp}) \u2014 supersedes any prior .strand in context.`;
 }
@@ -45,7 +45,7 @@ export type StrandAction =
 
 /**
  * Pure function: given existing CLAUDE.md content (or null if file doesn't
- * exist), returns the new content with strand section markers and the
+ * exist), returns the new content with strnd section markers and the
  * action that was taken.
  */
 export function applyStrandSection(

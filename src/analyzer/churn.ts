@@ -82,6 +82,25 @@ export function parseGitLogOutput(raw: string): Map<string, ChurnResult> {
  */
 export function computeChurn(rootDir: string): Map<string, ChurnResult> {
   try {
+    // Detect shallow clone — churn data will be incomplete/empty
+    try {
+      const isShallow = execSync("git rev-parse --is-shallow-repository", {
+        cwd: rootDir,
+        encoding: "utf-8",
+        timeout: 5000,
+      }).trim();
+      if (isShallow === "true") {
+        console.warn(
+          "Warning: shallow clone detected — churn data will be incomplete.",
+        );
+        console.warn(
+          "  Run `git fetch --unshallow` for accurate CHURN section.\n",
+        );
+      }
+    } catch {
+      // git rev-parse failed — proceed anyway
+    }
+
     const raw = execSync(
       `git log --numstat --format="%h|%aI|%s" --since="30 days ago"`,
       {
