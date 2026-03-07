@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
 import {
-  getHooksDir,
   generateTrampoline,
   STRND_HOOK_START,
   STRND_HOOK_END,

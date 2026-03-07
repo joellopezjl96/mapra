@@ -78,10 +78,7 @@ export function uninstallHook(hooksDir: string, hookType: HookType): void {
  * Resolve the hooks directory: checks core.hooksPath first, falls back to .git/hooks.
  */
 export function getHooksDir(targetPath: string): string | null {
-  const gitDir = path.join(targetPath, ".git");
-  if (!fs.existsSync(gitDir)) return null;
-
-  // Check core.hooksPath
+  // Check core.hooksPath first
   try {
     const customPath = execFileSync("git", ["config", "core.hooksPath"], {
       cwd: targetPath,
@@ -96,10 +93,21 @@ export function getHooksDir(targetPath: string): string | null {
       return resolved;
     }
   } catch {
-    // core.hooksPath not set — use default
+    // core.hooksPath not set — fall through
   }
 
-  return path.join(gitDir, "hooks");
+  // Use git rev-parse to handle worktrees, submodules, and normal repos
+  try {
+    const gitCommonDir = execFileSync("git", ["rev-parse", "--git-common-dir"], {
+      cwd: targetPath,
+      encoding: "utf-8",
+      timeout: 5000,
+    }).trim();
+
+    return path.join(path.resolve(targetPath, gitCommonDir), "hooks");
+  } catch {
+    return null;
+  }
 }
 
 /**
