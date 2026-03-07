@@ -15,6 +15,8 @@ import type {
   AssertionDiagnostic,
   BudgetSummary,
   AnalysisReport,
+  IterationDelta,
+  IterationComparison,
 } from "./types.js";
 
 // ─── Stat helpers (exported for testing) ─────────────────
@@ -498,6 +500,134 @@ export function formatReport(report: AnalysisReport): string {
   lines.push(`    Recoverable from redundant:   ~$${report.budget.recoverableFromRedundant.toFixed(2)}`);
   lines.push(`    Total savings available:       ~${report.budget.totalSavingsPercent}%`);
   lines.push("");
+
+  return lines.join("\n");
+}
+
+// ─── Cross-iteration comparison ──────────────────────────
+
+export function compareIterations(
+  before: BatchResults,
+  after: BatchResults,
+): IterationComparison {
+  // Build condition score maps: conditionId -> questionId -> score
+  const beforeScores = buildConditionScoreMap(before.results);
+  const afterScores = buildConditionScoreMap(after.results);
+
+  const deltas: IterationDelta[] = [];
+  const regressions: IterationComparison["regressions"] = [];
+  const improvements: IterationComparison["improvements"] = [];
+
+  // For each condition, compute aggregate delta
+  const allCondIds = new Set([...beforeScores.keys(), ...afterScores.keys()]);
+  for (const condId of allCondIds) {
+    const beforeMap = beforeScores.get(condId);
+    const afterMap = afterScores.get(condId);
+    if (!beforeMap || !afterMap) continue;
+
+    const beforeArr: number[] = [];
+    const afterArr: number[] = [];
+    const allQIds = new Set([...beforeMap.keys(), ...afterMap.keys()]);
+
+    for (const qId of allQIds) {
+      const bScore = beforeMap.get(qId);
+      const aScore = afterMap.get(qId);
+      if (bScore === undefined || aScore === undefined) continue;
+
+      beforeArr.push(bScore);
+      afterArr.push(aScore);
+
+      const diff = aScore - bScore;
+      if (diff < -0.10) {
+        regressions.push({ questionId: qId, conditionId: condId, before: bScore, after: aScore });
+      } else if (diff > 0.10) {
+        improvements.push({ questionId: qId, conditionId: condId, before: bScore, after: aScore });
+      }
+    }
+
+    if (beforeArr.length > 0) {
+      const meanBefore = beforeArr.reduce((a, b) => a + b, 0) / beforeArr.length;
+      const meanAfter = afterArr.reduce((a, b) => a + b, 0) / afterArr.length;
+      deltas.push({
+        conditionId: condId,
+        conditionName: findConditionName(before.results, condId) ?? condId,
+        scoreBefore: Math.round(meanBefore * 100) / 100,
+        scoreAfter: Math.round(meanAfter * 100) / 100,
+        delta: Math.round((meanAfter - meanBefore) * 100) / 100,
+        cliffsDelta: computeCliffsDelta(afterArr, beforeArr),
+      });
+    }
+  }
+
+  return {
+    beforeName: before.config.name,
+    afterName: after.config.name,
+    deltas,
+    regressions,
+    improvements,
+    costBefore: before.summary.totalCostEstimate,
+    costAfter: after.summary.totalCostEstimate,
+  };
+}
+
+function buildConditionScoreMap(
+  results: QuestionResult[],
+): Map<string, Map<string, number>> {
+  const map = new Map<string, Map<string, number>>();
+  for (const qr of results) {
+    for (const cr of qr.conditions) {
+      let qMap = map.get(cr.conditionId);
+      if (!qMap) {
+        qMap = new Map();
+        map.set(cr.conditionId, qMap);
+      }
+      qMap.set(qr.questionId, cr.aggregateScore);
+    }
+  }
+  return map;
+}
+
+function findConditionName(results: QuestionResult[], condId: string): string | undefined {
+  for (const qr of results) {
+    for (const cr of qr.conditions) {
+      if (cr.conditionId === condId) return cr.conditionName;
+    }
+  }
+  return undefined;
+}
+
+export function formatComparison(comp: IterationComparison): string {
+  const lines: string[] = [];
+
+  lines.push(`=== ITERATION COMPARISON: ${comp.beforeName} -> ${comp.afterName} ===\n`);
+
+  for (const d of comp.deltas) {
+    const sign = d.delta >= 0 ? "+" : "";
+    lines.push(
+      `  ${d.conditionName.padEnd(24)} ${d.scoreBefore.toFixed(2)} -> ${d.scoreAfter.toFixed(2)}  (${sign}${d.delta.toFixed(2)})  Cliff's d=${d.cliffsDelta.toFixed(2)}`,
+    );
+  }
+  lines.push("");
+
+  if (comp.improvements.length > 0) {
+    lines.push("  IMPROVEMENTS:");
+    for (const imp of comp.improvements) {
+      lines.push(`    ${imp.questionId} [${imp.conditionId}]: ${imp.before.toFixed(2)} -> ${imp.after.toFixed(2)}`);
+    }
+    lines.push("");
+  }
+
+  if (comp.regressions.length > 0) {
+    lines.push("  REGRESSIONS:");
+    for (const reg of comp.regressions) {
+      lines.push(`    ${reg.questionId} [${reg.conditionId}]: ${reg.before.toFixed(2)} -> ${reg.after.toFixed(2)}`);
+    }
+    lines.push("");
+  }
+
+  const costDelta = comp.costAfter - comp.costBefore;
+  const sign = costDelta >= 0 ? "+" : "";
+  lines.push(`  Cost: $${comp.costBefore.toFixed(2)} -> $${comp.costAfter.toFixed(2)} (${sign}$${costDelta.toFixed(2)})`);
 
   return lines.join("\n");
 }

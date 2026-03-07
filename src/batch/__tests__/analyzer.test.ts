@@ -16,8 +16,10 @@ import {
   computeDiagnostics,
   analyzeResults,
   formatReport,
+  compareIterations,
+  formatComparison,
 } from "../analyzer.js";
-import type { QuestionResult, Verdict, BatchResults } from "../types.js";
+import type { QuestionResult, Verdict, BatchResults, IterationComparison } from "../types.js";
 
 describe("analysis types", () => {
   it("ConditionStats has mean, stddev, min, max", () => {
@@ -354,5 +356,50 @@ describe("formatReport", () => {
     expect(text).toContain("Strand full");
     expect(text).toContain("ASSERTION DIAGNOSTICS");
     expect(text).toContain("non-discriminating");
+  });
+});
+
+describe("compareIterations", () => {
+  it("computes deltas between two result sets", () => {
+    const before = makeBatchResults();
+    before.config.name = "v1";
+
+    const afterResults = JSON.parse(JSON.stringify(makeResults())) as QuestionResult[];
+    afterResults[0]!.conditions[0]!.aggregateScore = 1.0;
+
+    const after: BatchResults = {
+      config: { name: "v2", timestamp: "2026-03-06", codebases: ["sbc"] },
+      results: afterResults,
+      summary: { totalApiCalls: 10, totalTokens: { input: 40000, output: 5000 }, totalCostEstimate: 0.19, durationMs: 100000 },
+    };
+
+    const comp = compareIterations(before, after);
+    expect(comp.beforeName).toBe("v1");
+    expect(comp.afterName).toBe("v2");
+    expect(comp.deltas.length).toBeGreaterThan(0);
+    expect(comp.costBefore).toBe(0.23);
+    expect(comp.costAfter).toBe(0.19);
+  });
+});
+
+describe("formatComparison", () => {
+  it("produces readable comparison text", () => {
+    const comp: IterationComparison = {
+      beforeName: "v1",
+      afterName: "v2",
+      deltas: [
+        { conditionId: "full", conditionName: "Strand full", scoreBefore: 0.75, scoreAfter: 0.82, delta: 0.07, cliffsDelta: 0.18 },
+      ],
+      regressions: [],
+      improvements: [{ questionId: "q1", conditionId: "full", before: 0.75, after: 0.82 }],
+      costBefore: 0.91,
+      costAfter: 0.74,
+    };
+
+    const text = formatComparison(comp);
+    expect(text).toContain("ITERATION COMPARISON");
+    expect(text).toContain("v1");
+    expect(text).toContain("v2");
+    expect(text).toContain("+0.07");
   });
 });
