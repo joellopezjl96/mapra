@@ -34,4 +34,10 @@ describe("generateHookShim", () => {
     expect(shim).toContain("finally");
     expect(shim).toContain("unlinkSync");
   });
+
+  it("includes stale lockfile cleanup (5 min threshold)", () => {
+    const shim = generateHookShim("1.0.0");
+    expect(shim).toContain("statSync");
+    expect(shim).toContain("300000");
+  });
 });

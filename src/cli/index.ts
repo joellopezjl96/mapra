@@ -147,11 +147,11 @@ async function runSetup(targetArg?: string) {
   const targetPath = resolveTarget(targetArg ?? process.cwd());
 
   // Step 1: Generate .strand
-  await runGenerate(targetArg);
+  await runGenerate(targetPath);
   console.log();
 
   // Step 2: Wire CLAUDE.md
-  await runInit(targetArg);
+  await runInit(targetPath);
 
   // Step 3: Write .strnd/hook.mjs
   const strndDir = path.join(targetPath, ".strnd");
