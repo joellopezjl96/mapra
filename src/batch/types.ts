@@ -102,6 +102,81 @@ export interface BatchResults {
   };
 }
 
+// ─── Analysis ────────────────────────────────────────────
+
+export type DiagnosticType =
+  | "non-discriminating"
+  | "flaky"
+  | "redundant"
+  | "negative-signal"
+  | "ceiling"
+  | "floor";
+
+export interface ConditionStats {
+  conditionId: string;
+  conditionName: string;
+  mean: number;
+  stddev: number;
+  min: number;
+  max: number;
+  verdictDistribution: { PASS: number; PARTIAL: number; FAIL: number };
+  avgInputTokens: number;
+  avgLatencyMs: number;
+}
+
+export interface ConditionComparison {
+  conditionA: string;
+  conditionB: string;
+  cliffsDelta: number;
+  cliffsMagnitude: "negligible" | "small" | "medium" | "large";
+  confidenceInterval: [number, number];
+  winRate: { wins: number; losses: number; ties: number; total: number };
+}
+
+export interface AssertionDiagnostic {
+  type: DiagnosticType;
+  questionId: string;
+  assertion: string;
+  detail: string;
+  passRates?: Record<string, number>;
+  trialScores?: number[];
+  cv?: number;
+  correlation?: number;
+  pairedWith?: string;
+}
+
+export interface BudgetSummary {
+  wastedOnNonDiscriminating: number;
+  recoverableFromRedundant: number;
+  totalSavingsPercent: number;
+}
+
+export interface AnalysisReport {
+  conditionStats: ConditionStats[];
+  comparisons: ConditionComparison[];
+  diagnostics: AssertionDiagnostic[];
+  budget: BudgetSummary;
+}
+
+export interface IterationDelta {
+  conditionId: string;
+  conditionName: string;
+  scoreBefore: number;
+  scoreAfter: number;
+  delta: number;
+  cliffsDelta: number;
+}
+
+export interface IterationComparison {
+  beforeName: string;
+  afterName: string;
+  deltas: IterationDelta[];
+  regressions: Array<{ questionId: string; conditionId: string; before: number; after: number }>;
+  improvements: Array<{ questionId: string; conditionId: string; before: number; after: number }>;
+  costBefore: number;
+  costAfter: number;
+}
+
 // ─── Checkpoint ─────────────────────────────────────────
 
 /** Tracks which (question × codebase × condition) tuples are done */
