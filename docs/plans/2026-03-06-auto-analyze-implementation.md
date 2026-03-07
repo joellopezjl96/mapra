@@ -1,0 +1,264 @@
+# Auto-Analyze + Experiment Cycle Skill Implementation Plan
+
+> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
+
+**Goal:** Auto-print free analysis after `strand batch` and create a personal experiment-cycle skill.
+
+**Architecture:** Add `analyzeResults` + `formatReport` call at the end of `runBatch()`. Create a skill file at `.claude/skills/experiment-cycle.md` with YAML frontmatter.
+
+**Tech Stack:** TypeScript, vitest, Claude Code skills (markdown + YAML frontmatter).
+
+---
+
+### Task 1: Auto-Print Analysis After Batch
+
+**Files:**
+- Modify: `src/batch/runner.ts:8-16` (add import)
+- Modify: `src/batch/runner.ts:315-318` (add auto-analyze before return)
+- Test: `src/batch/__tests__/smart-runner.test.ts` (add auto-analyze test)
+
+**Step 1: Write the failing test**
+
+Add to `src/batch/__tests__/smart-runner.test.ts`:
+
+```typescript
+import { analyzeResults, formatReport } from "../analyzer.js";
+import type { BatchResults } from "../types.js";
+
+describe("auto-analyze integration", () => {
+  it("analyzeResults + formatReport produces output from BatchResults", () => {
+    const batch: BatchResults = {
+      config: { name: "test", timestamp: "2026-03-06", codebases: ["sbc"] },
+      results: [
+        {
+          questionId: "q1",
+          question: "test?",
+          taskType: "planning",
+          codebaseName: "sbc",
+          conditions: [
+            {
+              conditionId: "full",
+              conditionName: "Strand full",
+              trials: [
+                {
+                  trial: 1,
+                  response: "answer",
+                  tokens: { input: 1000, output: 200 },
+                  latencyMs: 5000,
+                  scores: [
+                    { assertion: "check1", verdict: "PASS", reasoning: "ok" },
+                  ],
+                },
+              ],
+              aggregateScore: 0.8,
+            },
+          ],
+        },
+      ],
+      summary: {
+        totalApiCalls: 2,
+        totalTokens: { input: 1000, output: 200 },
+        totalCostEstimate: 0.01,
+        durationMs: 5000,
+      },
+    };
+
+    const report = analyzeResults(batch);
+    const text = formatReport(report);
+
+    expect(text).toContain("CONDITION COMPARISON");
+    expect(text).toContain("Strand full");
+    expect(report.conditionStats.length).toBe(1);
+  });
+});
+```
+
+**Step 2: Run test to verify it passes**
+
+This test validates that the function calls work correctly from the runner's perspective. It should pass immediately since `analyzeResults` and `formatReport` already exist.
+
+Run: `npx vitest run src/batch/__tests__/smart-runner.test.ts`
+Expected: PASS (all 5 tests)
+
+**Step 3: Add the import and auto-analyze call to runner.ts**
+
+Add import at top of `src/batch/runner.ts` (after line 16):
+
+```typescript
+import { analyzeResults, formatReport } from "./analyzer.js";
+```
+
+Add auto-analyze after the "Done" progress message (after line 317, before `return batchResults`):
+
+```typescript
+  // 9. Auto-analyze
+  const report = analyzeResults(batchResults);
+  onProgress("\n" + formatReport(report));
+```
+
+**Step 4: Run tests to verify nothing is broken**
+
+Run: `npx vitest run src/batch/__tests__/`
+Expected: All PASS
+
+**Step 5: Commit**
+
+```bash
+git add src/batch/runner.ts src/batch/__tests__/smart-runner.test.ts
+git commit -m "feat(batch): auto-print analysis report after batch run"
+```
+
+---
+
+### Task 2: Create Experiment Cycle Skill
+
+**Files:**
+- Create: `.claude/skills/experiment-cycle.md`
+
+**Step 1: Write the skill file**
+
+Create `.claude/skills/experiment-cycle.md`:
+
+```markdown
+---
+name: experiment-cycle
+description: Guide the strand experiment iteration cycle. Use when running strnd batch, strand batch, strand analyze, --advise, --judge-check, --smart, iterating on experiment configs, checking diagnostics, comparing experiment runs, editing assertions or conditions, writing findings, or mentioning non-discriminating, flaky, redundant, Cliff's delta, win rate, trial variance, or FINDINGS.md.
+---
+
+# Experiment Cycle
+
+Guide the strand batch experiment iteration cycle: RUN → DIAGNOSE → DECIDE → ADVISE → EDIT → RE-RUN → COMPARE → SHIP.
+
+**Type:** Flexible. Identify where the user is in the cycle based on context, then guide from there. Do not force the full cycle sequentially.
+
+## Entry Point Detection
+
+- User mentions a config file (.json in experiments/configs/) → Start at RUN
+- User mentions a results file (-results.json) → Start at DIAGNOSE
+- User mentions two result files → Start at COMPARE
+- User asks to edit/create assertions or questions → Start at EDIT
+- User mentions FINDINGS.md or writing up → Start at SHIP
+- User says "what should I change" or "iterate" → Start at ADVISE
+
+## The Cycle
+
+### 1. RUN
+
+```
+strand batch <config.json> [--smart] [--resume]
+```
+
+- **First run:** Don't use `--smart` — need full variance data
+- **Subsequent iterations:** Use `--smart` to save money (stops early on unanimous verdicts)
+- **If run fails partway:** Re-run with `--resume` to continue from checkpoint
+- **Output path:** Results land in `experiments/experiments/output/` when config is in `experiments/configs/` (resolved relative to config dir, up one level, then `outputDir`)
+
+### 2. DIAGNOSE
+
+The batch runner auto-prints the free analysis report at the end. Or run manually:
+
+```
+strand analyze <results.json>
+```
+
+Free. Prints: condition stats, pairwise comparisons (Cliff's Delta + bootstrap CI), assertion diagnostics, budget waste estimate.
+
+### 3. DECIDE
+
+Check diagnostics against these thresholds:
+
+| Signal | Threshold | Action |
+|--------|-----------|--------|
+| Budget waste | >20% totalSavingsPercent | Run --advise, prune before re-running |
+| Non-discriminating | Any flagged | Rewrite assertions to test reasoning, not keywords |
+| Flaky (CV > 0.5) | Any flagged | Assertion is ambiguous — rewrite it |
+| Flaky (CV 0.3–0.5) | >2 flagged | Consider adding 2 more trials for statistical power |
+| Redundant | Any flagged | Remove the redundant assertion |
+| Negative signal | Any flagged | Investigate — more context may be hurting |
+| Ceiling (all conditions >0.95) | Any question | Tighten assertions or retire question |
+| High flaky + untrusted judge | — | Run --judge-check (~$0.02) to verify judge consistency |
+
+**"Clean" means ready to ship:** 0 non-discriminating, 0 flaky, 0 redundant, <10% waste, no negative signals.
+
+If clean → skip to SHIP.
+
+### 4. ADVISE
+
+```
+strand analyze <results.json> --advise       # ~$0.05, Haiku-powered suggestions
+strand analyze <results.json> --judge-check  # ~$0.02, judge consistency check
+```
+
+- `--advise`: Suggests assertion rewrites, condition changes, question suggestions
+- `--judge-check`: Checks judge consistency and verdict bias
+- Don't pay for --advise if diagnostics are already clean
+
+### 5. EDIT
+
+- **Copy the config to a new file before editing** (e.g., `my-experiment-v2.json`). Never edit the original after a run has completed — you need it for comparison.
+- Apply assertion rewrites, condition changes, question adjustments from the advice
+- This is judgment work — do not automate it
+
+### 6. RE-RUN
+
+```
+strand batch <new-config.json> [--smart]
+```
+
+Same as step 1. `--smart` is recommended for iterations after the first run.
+
+### 7. COMPARE
+
+```
+strand analyze <old-results.json> <new-results.json>
+```
+
+- **Argument order matters:** first file = baseline, second file = new run
+- Check for regressions (score drops > 0.10) — investigate per-question before shipping
+- A net improvement with regressions means something the old config handled well may be broken
+
+### 8. SHIP
+
+Write findings to `FINDINGS.md` at repo root using this template:
+
+```markdown
+## Experiment N: <name> (<date>)
+
+**Config:** `experiments/configs/<config>.json`
+**Results:** `experiments/experiments/output/<name>-results.json`
+
+### Conditions
+| Condition | Mean | Cliff's Delta vs baseline |
+|-----------|------|--------------------------|
+
+### Key Findings
+1. ...
+
+### Implications
+- ...
+```
+
+Commit config, results, and FINDINGS.md together.
+```
+
+**Step 2: Verify the skill file is valid**
+
+Run: `cat .claude/skills/experiment-cycle.md | head -3`
+Expected: Shows YAML frontmatter starting with `---`
+
+**Step 3: Commit**
+
+```bash
+git add .claude/skills/experiment-cycle.md
+git commit -m "feat: add experiment-cycle skill for batch iteration workflow"
+```
+
+---
+
+## Task Dependency Graph
+
+```
+Task 1 (auto-print) ──→ Task 2 (skill file)
+```
+
+Task 2 references the auto-print behavior from Task 1 in its DIAGNOSE step.
