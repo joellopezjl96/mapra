@@ -78,7 +78,8 @@ switch (command) {
   case "batch": {
     const configFile = args.find((a) => !a.startsWith("--"));
     const resume = args.includes("--resume");
-    await runBatchCommand(configFile, resume);
+    const smart = args.includes("--smart");
+    await runBatchCommand(configFile, resume, smart);
     break;
   }
   case "analyze": {
@@ -129,8 +130,9 @@ Commands:
   uninstall-hooks [path]  Remove strnd git hooks
   validate-plan <plan.md> [--since YYYY-MM-DD] [--checkpoints]
                   Cross-reference plan file paths against .strand data
-  batch <config.json> [--resume]
+  batch <config.json> [--resume] [--smart]
                   Run batch experiment comparing encoding conditions
+                  --smart: score inline and stop early when verdicts are unanimous
   analyze <results.json> [--advise] [--judge-check]
                   Analyze experiment results: stats, diagnostics, recommendations
   analyze <old.json> <new.json>
@@ -677,9 +679,9 @@ async function runValidatePlan(
   }
 }
 
-async function runBatchCommand(configArg?: string, resume?: boolean) {
+async function runBatchCommand(configArg?: string, resume?: boolean, smart?: boolean) {
   if (!configArg) {
-    console.error("Usage: strnd batch <config.json> [--resume]");
+    console.error("Usage: strnd batch <config.json> [--resume] [--smart]");
     process.exit(1);
   }
 
@@ -697,7 +699,7 @@ async function runBatchCommand(configArg?: string, resume?: boolean) {
 
   try {
     const { runBatch } = await import("../batch/runner.js");
-    await runBatch(configPath, { resume });
+    await runBatch(configPath, { resume, smart });
   } catch (err) {
     handleError("batch", err);
   }

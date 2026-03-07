@@ -81,7 +81,7 @@ export async function generateAdvice(
   return parseAdviceResponse(text);
 }
 
-function parseAdviceResponse(text: string): Advice {
+export function parseAdviceResponse(text: string): Advice {
   const rewrites: Advice["assertionRewrites"] = [];
   const conditionSuggestions: string[] = [];
   const questionSuggestions: string[] = [];

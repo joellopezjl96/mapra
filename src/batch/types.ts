@@ -104,13 +104,13 @@ export interface BatchResults {
 
 // ─── Analysis ────────────────────────────────────────────
 
+// TODO: consider adding "ceiling" and "floor" diagnostic types
+// when detection logic is implemented
 export type DiagnosticType =
   | "non-discriminating"
   | "flaky"
   | "redundant"
-  | "negative-signal"
-  | "ceiling"
-  | "floor";
+  | "negative-signal";
 
 export interface ConditionStats {
   conditionId: string;

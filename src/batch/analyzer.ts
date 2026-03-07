@@ -8,7 +8,6 @@
 import type {
   BatchResults,
   QuestionResult,
-  ConditionResult,
   Verdict,
   ConditionStats,
   ConditionComparison,
@@ -118,8 +117,8 @@ export function computeConditionStats(
       conditionName: entry.name,
       mean,
       stddev: computeStddev(scores),
-      min: Math.min(...scores),
-      max: Math.max(...scores),
+      min: scores.reduce((a, b) => Math.min(a, b), Infinity),
+      max: scores.reduce((a, b) => Math.max(a, b), -Infinity),
       verdictDistribution: {
         PASS: entry.allVerdicts.filter((v) => v === "PASS").length / totalVerdicts,
         PARTIAL: entry.allVerdicts.filter((v) => v === "PARTIAL").length / totalVerdicts,
@@ -409,18 +408,33 @@ export function analyzeResults(batch: BatchResults): AnalysisReport {
   const conditionStats = computeConditionStats(batch.results);
   const comparisons = computeComparisons(batch.results);
   const diagnostics = computeDiagnostics(batch.results);
-  const budget = computeBudget(diagnostics, batch.summary.totalCostEstimate);
+  const budget = computeBudget(diagnostics, batch.summary.totalCostEstimate, batch.results);
 
   return { conditionStats, comparisons, diagnostics, budget };
+}
+
+function countUniqueAssertions(results: QuestionResult[]): number {
+  const seen = new Set<string>();
+  for (const qr of results) {
+    for (const cr of qr.conditions) {
+      for (const t of cr.trials) {
+        if (t.scores) {
+          for (const s of t.scores) seen.add(`${qr.questionId}:${s.assertion}`);
+        }
+      }
+    }
+  }
+  return seen.size;
 }
 
 function computeBudget(
   diags: AssertionDiagnostic[],
   totalCost: number,
+  results: QuestionResult[],
 ): BudgetSummary {
   const nonDisc = diags.filter((d) => d.type === "non-discriminating").length;
   const redundant = diags.filter((d) => d.type === "redundant").length;
-  const totalAssertions = nonDisc + redundant + 10;
+  const totalAssertions = countUniqueAssertions(results) || (nonDisc + redundant + 1);
   const wastedOnNonDiscriminating = (nonDisc / totalAssertions) * totalCost;
   const recoverableFromRedundant = (redundant / totalAssertions) * totalCost;
   const totalSavings = wastedOnNonDiscriminating + recoverableFromRedundant;
@@ -473,8 +487,6 @@ export function formatReport(report: AnalysisReport): string {
     flaky: "FLAKY",
     redundant: "REDUNDANT",
     "negative-signal": "NEGATIVE SIGNAL",
-    ceiling: "CEILING EFFECT",
-    floor: "FLOOR EFFECT",
   };
 
   const icons: Record<string, string> = {
@@ -482,8 +494,6 @@ export function formatReport(report: AnalysisReport): string {
     flaky: "~",
     redundant: "#",
     "negative-signal": "v",
-    ceiling: "^",
-    floor: "_",
   };
 
   for (const [type, diags] of Object.entries(grouped)) {
