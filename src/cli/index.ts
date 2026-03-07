@@ -10,6 +10,7 @@
  *   strnd status [path]   Show current strnd setup state
  *   strnd validate-plan <plan.md> [--since YYYY-MM-DD] [--checkpoints]  Cross-reference plan against .strand
  *   strnd batch <config.json> [--resume]  Run batch experiment from config
+ *   strnd analyze <results.json> [--advise] [--judge-check]  Analyze experiment results
  */
 
 import * as fs from "fs";
@@ -80,6 +81,14 @@ switch (command) {
     await runBatchCommand(configFile, resume);
     break;
   }
+  case "analyze": {
+    const files = args.filter((a) => !a.startsWith("--"));
+    const advise = args.includes("--advise");
+    const apply = args.includes("--apply");
+    const judgeCheck = args.includes("--judge-check");
+    await runAnalyzeCommand(files, { advise, apply, judgeCheck });
+    break;
+  }
   case "install-hooks": {
     const targetPath = resolveTarget(args[0]);
     const { installed, skipped } = installAllHooks(targetPath);
@@ -122,6 +131,10 @@ Commands:
                   Cross-reference plan file paths against .strand data
   batch <config.json> [--resume]
                   Run batch experiment comparing encoding conditions
+  analyze <results.json> [--advise] [--judge-check]
+                  Analyze experiment results: stats, diagnostics, recommendations
+  analyze <old.json> <new.json>
+                  Compare two experiment iterations
 
 Flags:
   --silent        Suppress output (used by git hooks)
@@ -687,6 +700,65 @@ async function runBatchCommand(configArg?: string, resume?: boolean) {
     await runBatch(configPath, { resume });
   } catch (err) {
     handleError("batch", err);
+  }
+}
+
+async function runAnalyzeCommand(
+  files: string[],
+  options: { advise: boolean; apply: boolean; judgeCheck: boolean },
+) {
+  if (files.length === 0) {
+    console.error("Usage: strnd analyze <results.json> [results2.json] [--advise] [--apply] [--judge-check]");
+    process.exit(1);
+  }
+
+  const { analyzeResults, formatReport, compareIterations, formatComparison } =
+    await import("../batch/analyzer.js");
+
+  const resultsPath = path.resolve(files[0]!);
+  if (!fs.existsSync(resultsPath)) {
+    console.error(`Error: results file not found: ${resultsPath}`);
+    process.exit(1);
+  }
+
+  const batch = JSON.parse(fs.readFileSync(resultsPath, "utf-8")) as import("../batch/types.js").BatchResults;
+
+  if (files.length === 1) {
+    const report = analyzeResults(batch);
+    console.log(formatReport(report));
+
+    if (options.judgeCheck) {
+      if (!process.env["ANTHROPIC_API_KEY"]) {
+        console.error("Error: --judge-check requires ANTHROPIC_API_KEY");
+        process.exit(1);
+      }
+      const { runJudgeCheck, formatJudgeCheck } = await import("../batch/judge-check.js");
+      const check = await runJudgeCheck(batch);
+      console.log(formatJudgeCheck(check));
+    }
+
+    if (options.advise) {
+      if (!process.env["ANTHROPIC_API_KEY"]) {
+        console.error("Error: --advise requires ANTHROPIC_API_KEY");
+        process.exit(1);
+      }
+      const { generateAdvice, formatAdvice } = await import("../batch/advisor.js");
+      const advice = await generateAdvice(report, batch);
+      console.log(formatAdvice(advice));
+
+      if (options.apply) {
+        console.log("\n--apply: config generation not yet implemented");
+      }
+    }
+  } else {
+    const afterPath = path.resolve(files[1]!);
+    if (!fs.existsSync(afterPath)) {
+      console.error(`Error: results file not found: ${afterPath}`);
+      process.exit(1);
+    }
+    const after = JSON.parse(fs.readFileSync(afterPath, "utf-8")) as import("../batch/types.js").BatchResults;
+    const comp = compareIterations(batch, after);
+    console.log(formatComparison(comp));
   }
 }
 
