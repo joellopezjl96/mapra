@@ -21,6 +21,7 @@ import type {
   ConditionResult,
   TrialResult,
   CheckpointKey,
+  Verdict,
 } from "./types.js";
 import type { StrandGraph } from "../scanner/index.js";
 import type { GraphAnalysis } from "../analyzer/index.js";
@@ -29,6 +30,7 @@ import type { GraphAnalysis } from "../analyzer/index.js";
 
 export interface RunOptions {
   resume?: boolean | undefined;
+  smart?: boolean | undefined;
   onProgress?: ((msg: string) => void) | undefined;
 }
 
@@ -40,7 +42,7 @@ export async function runBatch(
   configPath: string,
   options: RunOptions = {},
 ): Promise<BatchResults> {
-  const { resume = false, onProgress = console.log } = options;
+  const { resume = false, smart = false, onProgress = console.log } = options;
   const startTime = Date.now();
 
   // 1. Load and validate config
@@ -196,6 +198,28 @@ export async function runBatch(
           );
           trial.trial = t + 1;
           cr.trials.push(trial);
+
+          // Smart mode: score inline and check for early stopping
+          if (smart) {
+            trial.scores = await scoreResponse(
+              client,
+              config.judgeModel,
+              question.question,
+              trial.response,
+              question.assertions,
+            );
+
+            const trialVerdicts = cr.trials
+              .filter((tr) => tr.scores)
+              .map((tr) => tr.scores!.map((s) => s.verdict));
+
+            if (shouldStopEarly(trialVerdicts, 3)) {
+              onProgress(
+                `    → early stop: ${question.id} × ${condition.name} (unanimous after ${t + 1} trials)`,
+              );
+              break;
+            }
+          }
 
           // Rate limit
           if (config.delayMs > 0) {
@@ -457,6 +481,23 @@ function saveCheckpoint(
 
 function keyFor(ck: CheckpointKey): string {
   return `${ck.questionId}:${ck.codebaseName}:${ck.conditionId}`;
+}
+
+// ─── Smart runner ────────────────────────────────────────
+
+/**
+ * Check if trials are unanimous enough to stop early.
+ * Returns true when all trial verdict patterns match and we have at least minTrials.
+ */
+export function shouldStopEarly(
+  trialVerdicts: Verdict[][],
+  minTrials: number,
+): boolean {
+  if (trialVerdicts.length < minTrials) return false;
+
+  // Check if all trials have the same aggregate verdict pattern
+  const firstPattern = trialVerdicts[0]!.join(",");
+  return trialVerdicts.every((v) => v.join(",") === firstPattern);
 }
 
 // ─── Helpers ────────────────────────────────────────────
