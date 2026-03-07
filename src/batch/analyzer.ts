@@ -400,3 +400,104 @@ function checkNegativeSignal(
     }
   }
 }
+
+// ─── Public API ──────────────────────────────────────────
+
+export function analyzeResults(batch: BatchResults): AnalysisReport {
+  const conditionStats = computeConditionStats(batch.results);
+  const comparisons = computeComparisons(batch.results);
+  const diagnostics = computeDiagnostics(batch.results);
+  const budget = computeBudget(diagnostics, batch.summary.totalCostEstimate);
+
+  return { conditionStats, comparisons, diagnostics, budget };
+}
+
+function computeBudget(
+  diags: AssertionDiagnostic[],
+  totalCost: number,
+): BudgetSummary {
+  const nonDisc = diags.filter((d) => d.type === "non-discriminating").length;
+  const redundant = diags.filter((d) => d.type === "redundant").length;
+  const totalAssertions = nonDisc + redundant + 10;
+  const wastedOnNonDiscriminating = (nonDisc / totalAssertions) * totalCost;
+  const recoverableFromRedundant = (redundant / totalAssertions) * totalCost;
+  const totalSavings = wastedOnNonDiscriminating + recoverableFromRedundant;
+
+  return {
+    wastedOnNonDiscriminating: Math.round(wastedOnNonDiscriminating * 100) / 100,
+    recoverableFromRedundant: Math.round(recoverableFromRedundant * 100) / 100,
+    totalSavingsPercent: totalCost > 0 ? Math.round((totalSavings / totalCost) * 100) : 0,
+  };
+}
+
+export function formatReport(report: AnalysisReport): string {
+  const lines: string[] = [];
+
+  lines.push("=== CONDITION COMPARISON ===\n");
+  for (const s of report.conditionStats) {
+    lines.push(
+      `  ${s.conditionName.padEnd(24)} ${s.mean.toFixed(2)} +/- ${s.stddev.toFixed(2)}  (min ${s.min.toFixed(2)}, max ${s.max.toFixed(2)})`,
+    );
+  }
+  lines.push("");
+
+  for (const c of report.comparisons) {
+    lines.push(
+      `  Cliff's Delta (${c.conditionA} vs ${c.conditionB}):  ${c.cliffsDelta >= 0 ? "+" : ""}${c.cliffsDelta.toFixed(2)} [${c.cliffsMagnitude}]  CI: [${c.confidenceInterval[0]}, ${c.confidenceInterval[1]}]`,
+    );
+    lines.push(
+      `  Win rate: ${c.conditionA} wins ${c.winRate.wins}/${c.winRate.total}, ties ${c.winRate.ties}, loses ${c.winRate.losses}`,
+    );
+  }
+  lines.push("");
+
+  for (const s of report.conditionStats) {
+    const { PASS, PARTIAL, FAIL } = s.verdictDistribution;
+    lines.push(
+      `    ${s.conditionName.padEnd(20)} PASS ${(PASS * 100).toFixed(0)}% | PARTIAL ${(PARTIAL * 100).toFixed(0)}% | FAIL ${(FAIL * 100).toFixed(0)}%`,
+    );
+  }
+  lines.push("");
+
+  lines.push("=== ASSERTION DIAGNOSTICS ===\n");
+
+  const grouped: Record<string, AssertionDiagnostic[]> = {};
+  for (const d of report.diagnostics) {
+    (grouped[d.type] ??= []).push(d);
+  }
+
+  const labels: Record<string, string> = {
+    "non-discriminating": "NON-DISCRIMINATING",
+    flaky: "FLAKY",
+    redundant: "REDUNDANT",
+    "negative-signal": "NEGATIVE SIGNAL",
+    ceiling: "CEILING EFFECT",
+    floor: "FLOOR EFFECT",
+  };
+
+  const icons: Record<string, string> = {
+    "non-discriminating": "!",
+    flaky: "~",
+    redundant: "#",
+    "negative-signal": "v",
+    ceiling: "^",
+    floor: "_",
+  };
+
+  for (const [type, diags] of Object.entries(grouped)) {
+    lines.push(`  ${labels[type] ?? type}:`);
+    for (const d of diags) {
+      lines.push(`  ${icons[type] ?? "?"} ${d.questionId}: "${d.assertion}"`);
+      lines.push(`    ${d.detail}`);
+    }
+    lines.push("");
+  }
+
+  lines.push("  BUDGET SUMMARY:");
+  lines.push(`    Wasted on non-discriminating: ~$${report.budget.wastedOnNonDiscriminating.toFixed(2)}`);
+  lines.push(`    Recoverable from redundant:   ~$${report.budget.recoverableFromRedundant.toFixed(2)}`);
+  lines.push(`    Total savings available:       ~${report.budget.totalSavingsPercent}%`);
+  lines.push("");
+
+  return lines.join("\n");
+}

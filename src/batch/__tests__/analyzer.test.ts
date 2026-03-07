@@ -14,8 +14,10 @@ import {
   computeConditionStats,
   computeComparisons,
   computeDiagnostics,
+  analyzeResults,
+  formatReport,
 } from "../analyzer.js";
-import type { QuestionResult, Verdict } from "../types.js";
+import type { QuestionResult, Verdict, BatchResults } from "../types.js";
 
 describe("analysis types", () => {
   it("ConditionStats has mean, stddev, min, max", () => {
@@ -317,5 +319,40 @@ describe("computeDiagnostics", () => {
     const redundant = diags.filter((d) => d.type === "redundant");
     expect(redundant.length).toBeGreaterThan(0);
     expect(redundant[0]!.pairedWith).toBeDefined();
+  });
+});
+
+function makeBatchResults(): BatchResults {
+  return {
+    config: { name: "test", timestamp: "2026-03-06", codebases: ["sbc"] },
+    results: makeResults(),
+    summary: {
+      totalApiCalls: 12,
+      totalTokens: { input: 48000, output: 6000 },
+      totalCostEstimate: 0.23,
+      durationMs: 120000,
+    },
+  };
+}
+
+describe("analyzeResults", () => {
+  it("produces a complete AnalysisReport from BatchResults", () => {
+    const report = analyzeResults(makeBatchResults());
+    expect(report.conditionStats.length).toBe(2);
+    expect(report.comparisons.length).toBe(1);
+    expect(report.diagnostics.length).toBeGreaterThan(0);
+    expect(report.budget).toBeDefined();
+  });
+});
+
+describe("formatReport", () => {
+  it("produces human-readable stdout text", () => {
+    const report = analyzeResults(makeBatchResults());
+    const text = formatReport(report);
+
+    expect(text).toContain("CONDITION COMPARISON");
+    expect(text).toContain("Strand full");
+    expect(text).toContain("ASSERTION DIAGNOSTICS");
+    expect(text).toContain("non-discriminating");
   });
 });
