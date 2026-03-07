@@ -14,6 +14,7 @@ import { encodeToStrandFormat } from "../encoder/strand-format-encode.js";
 import { encodeToText } from "../encoder/text-encode.js";
 import { scoreResponse, aggregateScores } from "./scorer.js";
 import { generateMarkdownReport } from "./reporter.js";
+import { analyzeResults, formatReport } from "./analyzer.js";
 import type {
   BatchConfig,
   BatchResults,
@@ -315,6 +316,10 @@ export async function runBatch(
   onProgress(
     `\nDone: ${batchResults.summary.totalApiCalls} API calls, ~$${batchResults.summary.totalCostEstimate.toFixed(2)} estimated cost`,
   );
+
+  // 9. Auto-analyze
+  const report = analyzeResults(batchResults);
+  onProgress("\n" + formatReport(report));
 
   return batchResults;
 }
