@@ -26,8 +26,13 @@ export interface GraphAnalysis {
  * Returns sorted results ready for rendering.
  */
 export function analyzeGraph(graph: StrandGraph, rootDir?: string): GraphAnalysis {
-  // Build reverse adjacency once, excluding test edges
-  const reverseAdj = buildReverseAdjacency(graph.edges, true);
+  // Collect test node IDs for filtering
+  const testNodeIds = new Set(
+    graph.nodes.filter(n => n.type === "test").map(n => n.id),
+  );
+
+  // Build reverse adjacency once, excluding test edges and test-sourced edges
+  const reverseAdj = buildReverseAdjacency(graph.edges, true, testNodeIds);
 
   // Compute blast radii
   const blastMap = computeAllBlastRadii(reverseAdj);

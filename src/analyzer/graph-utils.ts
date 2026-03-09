@@ -7,16 +7,19 @@ import type { StrandEdge } from "../scanner/index.js";
 
 /**
  * Build reverse adjacency: for each node, who imports it.
- * Optionally excludes test edges (type === "tests").
+ * Optionally excludes test edges (type === "tests") and/or
+ * edges where the source node is a test file (by ID).
  */
 export function buildReverseAdjacency(
   edges: StrandEdge[],
   excludeTestEdges = false,
+  testNodeIds?: Set<string>,
 ): Map<string, Set<string>> {
   const rev = new Map<string, Set<string>>();
 
   for (const edge of edges) {
     if (excludeTestEdges && edge.type === "tests") continue;
+    if (testNodeIds && testNodeIds.has(edge.from)) continue;
     if (!rev.has(edge.to)) rev.set(edge.to, new Set());
     rev.get(edge.to)!.add(edge.from);
   }

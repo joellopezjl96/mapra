@@ -267,8 +267,9 @@ function classifyFile(
 
   // Test files
   if (
-    /\.(test|spec)\.(ts|tsx|js|jsx)$/.test(normalized) ||
-    normalized.includes("__tests__/")
+    /\.(test|spec|e2e-spec|e2e)\.(ts|tsx|js|jsx)$/.test(normalized) ||
+    normalized.includes("__tests__/") ||
+    /(?:^|\/)(?:playwright|cypress|test|tests|e2e)\//.test(normalized)
   ) {
     return "test";
   }
@@ -289,6 +290,7 @@ function classifyFile(
     if (/\/api\/.*route\.(ts|js)$/.test(normalized)) return "api-route";
     if (/\/page\.(tsx|jsx|ts|js)$/.test(normalized)) return "route";
     if (/\/layout\.(tsx|jsx|ts|js)$/.test(normalized)) return "layout";
+    if (/\/(loading|error|not-found|template|default|global-error)\.(tsx|jsx|ts|js)$/.test(normalized)) return "route";
     if (/middleware\.(ts|js)$/.test(normalized)) return "middleware";
   }
 

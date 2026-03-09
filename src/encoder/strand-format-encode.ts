@@ -118,7 +118,12 @@ function renderInfrastructure(graph: StrandGraph): string {
 }
 
 function renderRisk(graph: StrandGraph, analysis: GraphAnalysis): string {
-  const top = analysis.risk.slice(0, 8);
+  // Filter out test files from risk — test infra inflates blast radius
+  const testNodeIds = new Set(
+    graph.nodes.filter(n => n.type === "test").map(n => n.id),
+  );
+  const filtered = analysis.risk.filter(r => !testNodeIds.has(r.nodeId));
+  const top = filtered.slice(0, 8);
   if (top.length === 0) return "";
 
   // Build node lookup and test edge counts
@@ -164,7 +169,7 @@ function renderRisk(graph: StrandGraph, analysis: GraphAnalysis): string {
     }
   }
 
-  const remaining = analysis.risk.length - top.length;
+  const remaining = filtered.length - top.length;
   if (remaining > 0) {
     out += `  +${remaining} more with blast radius > 1\n`;
   }
@@ -308,8 +313,14 @@ function renderHotspots(graph: StrandGraph): string {
 }
 
 function renderMostImported(graph: StrandGraph): string {
+  // Filter out test files from most imported
+  const testNodeIds = new Set(
+    graph.nodes.filter(n => n.type === "test").map(n => n.id),
+  );
   const edgeCounts = new Map<string, number>();
   for (const edge of graph.edges) {
+    if (testNodeIds.has(edge.from)) continue;
+    if (testNodeIds.has(edge.to)) continue;
     edgeCounts.set(edge.to, (edgeCounts.get(edge.to) || 0) + 1);
   }
 
