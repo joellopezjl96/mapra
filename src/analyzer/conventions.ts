@@ -8,6 +8,7 @@
 import type { StrandNode, StrandEdge } from "../scanner/index.js";
 
 const CONVENTION_THRESHOLD = 0.6;
+const VIOLATION_THRESHOLD = 0.7;
 const MIN_TYPE_COUNT = 3;
 
 export interface Convention {
@@ -17,6 +18,7 @@ export interface Convention {
   adoption: number;
   total: number;
   coverage: number;
+  violators: string[];  // files of this type that DON'T follow the convention (for coverage >= 70%)
 }
 
 /**
@@ -71,6 +73,18 @@ export function detectConventions(
       const depNode = nodeMap.get(dep);
       if (depNode?.type === type) continue;
 
+      // Find violators: files of this type that DON'T import the convention dep
+      // Only populate for conventions with >= 70% adoption (strong conventions)
+      let violators: string[] = [];
+      if (coverage >= VIOLATION_THRESHOLD) {
+        violators = typeNodes
+          .filter((n) => {
+            const deps = imports.get(n.id);
+            return !deps || !deps.has(dep);
+          })
+          .map((n) => n.id);
+      }
+
       conventions.push({
         anchorFile: dep,
         anchorExports: depNode?.exports?.filter((e) => e !== "default") ?? [],
@@ -78,6 +92,7 @@ export function detectConventions(
         adoption: count,
         total: typeNodes.length,
         coverage,
+        violators,
       });
     }
   }

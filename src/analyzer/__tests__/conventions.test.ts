@@ -31,6 +31,57 @@ describe("detectConventions", () => {
     expect(sentry!.anchorExports).toContain("captureException");
   });
 
+  it("populates violators for conventions with >= 70% adoption", () => {
+    // 3 of 4 API routes import sentry.ts (75% >= 70% threshold)
+    const nodes: StrandNode[] = [
+      { id: "src/sentry.ts", path: "src/sentry.ts", type: "utility", name: "sentry.ts", lines: 50, imports: [], exports: ["captureException"], complexity: 0.1 },
+      { id: "src/api/a/route.ts", path: "src/api/a/route.ts", type: "api-route", name: "route.ts", lines: 30, imports: ["src/sentry.ts"], exports: ["GET"], complexity: 0.2 },
+      { id: "src/api/b/route.ts", path: "src/api/b/route.ts", type: "api-route", name: "route.ts", lines: 30, imports: ["src/sentry.ts"], exports: ["POST"], complexity: 0.2 },
+      { id: "src/api/c/route.ts", path: "src/api/c/route.ts", type: "api-route", name: "route.ts", lines: 30, imports: ["src/sentry.ts"], exports: ["GET"], complexity: 0.2 },
+      { id: "src/api/d/route.ts", path: "src/api/d/route.ts", type: "api-route", name: "route.ts", lines: 30, imports: [], exports: ["DELETE"], complexity: 0.2 },
+    ];
+
+    const edges: StrandEdge[] = [
+      { from: "src/api/a/route.ts", to: "src/sentry.ts", type: "imports", weight: 1 },
+      { from: "src/api/b/route.ts", to: "src/sentry.ts", type: "imports", weight: 1 },
+      { from: "src/api/c/route.ts", to: "src/sentry.ts", type: "imports", weight: 1 },
+    ];
+
+    const conventions = detectConventions(nodes, edges);
+    const sentry = conventions.find((c) => c.anchorFile === "src/sentry.ts");
+    expect(sentry).toBeDefined();
+    expect(sentry!.violators).toEqual(["src/api/d/route.ts"]);
+  });
+
+  it("does not populate violators for conventions below 70% adoption", () => {
+    // 3 of 5 API routes import sentry.ts (60%, below 70% violation threshold)
+    const nodes: StrandNode[] = [
+      { id: "src/sentry.ts", path: "src/sentry.ts", type: "utility", name: "sentry.ts", lines: 50, imports: [], exports: ["captureException"], complexity: 0.1 },
+      ...Array.from({ length: 5 }, (_, i) => ({
+        id: `src/api/${i}/route.ts`,
+        path: `src/api/${i}/route.ts`,
+        type: "api-route" as const,
+        name: "route.ts",
+        lines: 30,
+        imports: i < 3 ? ["src/sentry.ts"] : [],
+        exports: ["GET"],
+        complexity: 0.2,
+      })),
+    ];
+
+    const edges: StrandEdge[] = Array.from({ length: 3 }, (_, i) => ({
+      from: `src/api/${i}/route.ts`,
+      to: "src/sentry.ts",
+      type: "imports" as const,
+      weight: 1,
+    }));
+
+    const conventions = detectConventions(nodes, edges);
+    const sentry = conventions.find((c) => c.anchorFile === "src/sentry.ts");
+    expect(sentry).toBeDefined();
+    expect(sentry!.violators).toEqual([]);
+  });
+
   it("ignores patterns below 60% threshold", () => {
     // 2 of 5 routes import auth.ts (40%) — not a convention
     const nodes: StrandNode[] = [

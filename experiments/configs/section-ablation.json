@@ -20,30 +20,12 @@
       "trials": 3
     },
     {
-      "id": "no-domains",
-      "name": "No DOMAINS",
+      "id": "no-co-change",
+      "name": "No CO-CHANGE",
       "model": "claude-sonnet-4-6",
       "encoding": "strand-v3",
       "includeUsageLine": true,
-      "excludeSections": ["DOMAINS"],
-      "trials": 3
-    },
-    {
-      "id": "no-terrain",
-      "name": "No TERRAIN",
-      "model": "claude-sonnet-4-6",
-      "encoding": "strand-v3",
-      "includeUsageLine": true,
-      "excludeSections": ["TERRAIN"],
-      "trials": 3
-    },
-    {
-      "id": "no-hotspots",
-      "name": "No HOTSPOTS",
-      "model": "claude-sonnet-4-6",
-      "encoding": "strand-v3",
-      "includeUsageLine": true,
-      "excludeSections": ["HOTSPOTS"],
+      "excludeSections": ["CO-CHANGE"],
       "trials": 3
     },
     {

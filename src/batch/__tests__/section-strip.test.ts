@@ -80,6 +80,7 @@ function makeAnalysis(): GraphAnalysis {
     deadCode: [],
     churn: new Map(),
     conventions: [],
+    coChanges: [],
   };
 }
 
@@ -96,15 +97,14 @@ describe("section stripping", () => {
     expect(stripped).not.toContain("─── RISK");
 
     // Other sections should remain
-    expect(stripped).toContain("─── HOTSPOTS");
     expect(stripped).toContain("─── TEST COVERAGE");
   });
 
-  it("removes HOTSPOTS section while keeping RISK", () => {
+  it("removes MOST IMPORTED section while keeping RISK", () => {
     const encoding = encodeToStrandFormat(makeGraph(), makeAnalysis());
-    const stripped = stripSection(encoding, "HOTSPOTS");
+    const stripped = stripSection(encoding, "MOST IMPORTED");
 
-    expect(stripped).not.toContain("─── HOTSPOTS");
+    expect(stripped).not.toContain("─── MOST IMPORTED");
     expect(stripped).toContain("─── RISK");
   });
 
