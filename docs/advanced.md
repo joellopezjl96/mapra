@@ -129,6 +129,38 @@ Detected patterns — if most files of a type import a shared helper, this secti
 
 Files unreachable from the import graph. Candidates for deletion.
 
+## CI / Automation
+
+The `strnd check --fail-if-stale` command exits with code 1 when `.strand` is out of date, making it ideal for CI gates and pre-commit hooks.
+
+### GitHub Actions
+
+```yaml
+name: Check .strand freshness
+on: [pull_request]
+jobs:
+  strand-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npx strnd check --fail-if-stale
+```
+
+### Pre-commit hook (via pre-commit framework)
+
+```yaml
+repos:
+  - repo: local
+    hooks:
+      - id: strand-freshness
+        name: Check .strand freshness
+        entry: npx strnd check --fail-if-stale
+        language: system
+        pass_filenames: false
+```
+
 ## Experiment Tooling
 
 Strnd includes a batch experiment runner for systematically testing encoding effectiveness. This is primarily for strnd development, but available to anyone.

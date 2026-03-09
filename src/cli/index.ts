@@ -8,6 +8,7 @@
  *   strnd update [path]   Regenerate .strand in place (alias for generate in cwd)
  *   strnd init [path]     Wire .strand into project's CLAUDE.md
  *   strnd status [path]   Show current strnd setup state
+ *   strnd check [path]    Check if .strand is current or stale (git hash comparison)
  *   strnd validate-plan <plan.md> [--since YYYY-MM-DD] [--checkpoints]  Cross-reference plan against .strand
  *   strnd batch <config.json> [--resume]  Run batch experiment from config
  *   strnd analyze <results.json> [--advise] [--judge-check]  Analyze experiment results
@@ -65,6 +66,12 @@ switch (command) {
   case "status":
     await runStatus(args[0]);
     break;
+  case "check": {
+    const failIfStale = args.includes("--fail-if-stale");
+    const targetArg = args.find((a) => !a.startsWith("--"));
+    await runCheck(targetArg, failIfStale);
+    break;
+  }
   case "validate-plan": {
     const sinceIdx = args.indexOf("--since");
     const since = sinceIdx >= 0 ? args[sinceIdx + 1] : undefined;
@@ -126,6 +133,8 @@ Commands:
   update [path]   Regenerate .strand in place (alias for generate in cwd)
   init [path]     Wire @.strand reference into project's CLAUDE.md
   status [path]   Show whether .strand is present, wired, and fresh
+  check [path]    Check if .strand is current or stale (compares git hash)
+                  --fail-if-stale: exit code 1 if stale (for CI)
   install-hooks [path]    Install git hooks for auto-update
   uninstall-hooks [path]  Remove strnd git hooks
   validate-plan <plan.md> [--since YYYY-MM-DD] [--checkpoints]
@@ -266,6 +275,7 @@ async function runGenerate(targetArg?: string, softFail = false, silent = false)
     const { analyzeGraph } = await import("../analyzer/index.js");
     const { encodeToStrandFormat } =
       await import("../encoder/strand-format-encode.js");
+    const { getGitHash } = await import("../analyzer/git-hash.js");
 
     const outputPath = path.join(targetPath, ".strand");
 
@@ -286,7 +296,8 @@ async function runGenerate(targetArg?: string, softFail = false, silent = false)
     }
 
     const analysis = analyzeGraph(graph, targetPath);
-    const encoded = encodeToStrandFormat(graph, analysis);
+    const gitHash = getGitHash(targetPath);
+    const encoded = encodeToStrandFormat(graph, analysis, { gitHash });
     const tokens = Math.round(encoded.length / 4);
 
     const tmpPath = outputPath + ".tmp";
@@ -373,15 +384,31 @@ async function runStatus(targetArg?: string) {
   if (!fs.existsSync(strandPath)) {
     console.log(`  .strand       ✗ not found (run 'strnd setup')`);
   } else {
+    const { parseStrandHeader } = await import("../encoder/parse-strand-header.js");
+    const { getGitHash } = await import("../analyzer/git-hash.js");
+
+    const strandContent = fs.readFileSync(strandPath, "utf-8");
+    const header = parseStrandHeader(strandContent);
+
     const strandMtime = fs.statSync(strandPath).mtimeMs;
     const sourceMtime = newestSourceFileMtime(targetPath);
     const ageMs = Date.now() - strandMtime;
     const ageDays = Math.floor(ageMs / 86_400_000);
     const ageStr =
       ageDays === 0 ? "today" : `${ageDays} day${ageDays !== 1 ? "s" : ""} ago`;
-    const stale = sourceMtime > strandMtime;
-    const staleStr = stale ? " ⚠ may be stale (run 'strnd update')" : "";
-    console.log(`  .strand       ✓ present (updated ${ageStr})${staleStr}`);
+
+    // Use git hash comparison if available, fall back to mtime
+    const currentHash = getGitHash(targetPath);
+    let staleStr = "";
+    if (header?.gitHash && currentHash) {
+      if (header.gitHash !== currentHash) {
+        staleStr = ` \u26A0 stale (generated at git:${header.gitHash}, HEAD is ${currentHash})`;
+      }
+    } else {
+      const stale = sourceMtime > strandMtime;
+      staleStr = stale ? " \u26A0 may be stale (run 'strnd update')" : "";
+    }
+    console.log(`  .strand       \u2713 present (updated ${ageStr})${staleStr}`);
   }
 
   // CLAUDE.md wiring
@@ -431,6 +458,90 @@ async function runStatus(targetArg?: string) {
   }
 
   console.log();
+}
+
+async function runCheck(targetArg?: string, failIfStale = false) {
+  const targetPath = resolveTarget(targetArg);
+  const strandPath = path.join(targetPath, ".strand");
+
+  if (!fs.existsSync(strandPath)) {
+    console.error(".strand not found. Run 'strnd setup' or 'strnd generate' first.");
+    process.exit(1);
+  }
+
+  const { parseStrandHeader } = await import("../encoder/parse-strand-header.js");
+  const { getGitHash } = await import("../analyzer/git-hash.js");
+  const { execSync } = await import("child_process");
+
+  const strandContent = fs.readFileSync(strandPath, "utf-8");
+  const header = parseStrandHeader(strandContent);
+
+  if (!header) {
+    console.error(".strand header is malformed. Run 'strnd generate' to regenerate.");
+    process.exit(1);
+  }
+
+  const currentHash = getGitHash(targetPath);
+
+  // Case 1: No git available
+  if (!currentHash) {
+    console.log(`.strand generated ${header.timestamp} (not a git repo — cannot compare)`);
+    process.exit(0);
+  }
+
+  // Case 2: Legacy .strand without git hash
+  if (!header.gitHash) {
+    console.log(`.strand generated ${header.timestamp} (no git hash in header — run 'strnd update' to add)`);
+    if (failIfStale) {
+      console.log("Cannot determine staleness without git hash in .strand header.");
+      process.exit(1);
+    }
+    process.exit(0);
+  }
+
+  // Case 3: Current — hashes match
+  if (header.gitHash === currentHash) {
+    console.log(`.strand is current (generated at commit ${header.gitHash}, HEAD is ${currentHash})`);
+    process.exit(0);
+  }
+
+  // Case 4: Stale — hashes differ
+  let commitsAhead = "unknown";
+  let changedFiles = "unknown";
+  try {
+    commitsAhead = execSync(`git rev-list --count ${header.gitHash}..HEAD`, {
+      cwd: targetPath,
+      encoding: "utf-8",
+      timeout: 5000,
+      stdio: ["pipe", "pipe", "pipe"],
+    }).trim();
+  } catch {
+    // git rev-list may fail if the generation commit is not in history (e.g., rebase)
+  }
+
+  try {
+    const diffOutput = execSync(`git diff --name-only ${header.gitHash}..HEAD`, {
+      cwd: targetPath,
+      encoding: "utf-8",
+      timeout: 5000,
+      stdio: ["pipe", "pipe", "pipe"],
+    }).trim();
+    changedFiles = diffOutput ? String(diffOutput.split("\n").length) : "0";
+  } catch {
+    // git diff may fail if the generation commit is not in history
+  }
+
+  console.log(`.strand may be stale:`);
+  console.log(`  Generated: ${header.timestamp} (commit ${header.gitHash})`);
+  console.log(`  Current HEAD: ${currentHash} (${commitsAhead} commits ahead)`);
+  console.log(`  Changed files since generation: ${changedFiles}`);
+  console.log(`  Run 'strnd update' to refresh.`);
+
+  if (failIfStale) {
+    process.exit(1);
+  }
+
+  process.exit(0);
 }
 
 async function runValidatePlan(

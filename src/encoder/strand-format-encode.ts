@@ -12,16 +12,22 @@ import type { StrandGraph, StrandEdge } from "../scanner/index.js";
 import type { GraphAnalysis } from "../analyzer/index.js";
 import { getModuleId } from "../analyzer/graph-utils.js";
 
+export interface EncodeOptions {
+  /** Short git hash at generation time (omitted from header if null/undefined) */
+  gitHash?: string | null | undefined;
+}
+
 /**
  * Generate a .strand format encoding of the codebase.
  * Does NOT use the layout engine — no coordinates needed.
  */
-export function encodeToStrandFormat(graph: StrandGraph, analysis?: GraphAnalysis): string {
+export function encodeToStrandFormat(graph: StrandGraph, analysis?: GraphAnalysis, options?: EncodeOptions): string {
   let out = "";
 
   // Header
   const generated = new Date().toISOString().slice(0, 19);
-  out += `STRAND v3 | ${graph.projectName} | ${capitalize(graph.framework)} | ${graph.totalFiles} files | ${graph.totalLines.toLocaleString()} lines | generated ${generated}\n`;
+  const gitSuffix = options?.gitHash ? ` | git:${options.gitHash}` : "";
+  out += `STRAND v3 | ${graph.projectName} | ${capitalize(graph.framework)} | ${graph.totalFiles} files | ${graph.totalLines.toLocaleString()} lines | generated ${generated}${gitSuffix}\n`;
   out += `LEGEND: ×N=imported by N files | ═/·=coupling strong/weak | ×A→B=A direct, B total affected | dN=cascade depth | [AMP]=amplification≥2x | TN=N test files | NL=lines of code\n`;
   out += `USAGE: planning→RISK,CONVENTIONS,INFRASTRUCTURE | debugging→FLOWS,CHURN,HOTSPOTS | refactoring→RISK,CHURN | review→CONVENTIONS,RISK,CHURN | impact-analysis→RISK,INFRASTRUCTURE\n\n`;
 
