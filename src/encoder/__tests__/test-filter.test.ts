@@ -67,6 +67,7 @@ function makeAnalysis(): GraphAnalysis {
     deadCode: [],
     churn: new Map(),
     conventions: [],
+    coChanges: [],
   };
 }
 

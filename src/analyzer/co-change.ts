@@ -31,11 +31,11 @@ export function parseGitLogNameOnly(raw: string): Set<string>[] {
   for (const line of raw.split("\n")) {
     const trimmed = line.trim();
     if (!trimmed) {
-      // Blank line = end of commit block
+      // Blank line = end of commit block (only if we have files)
       if (currentFiles && currentFiles.size > 0) {
         commits.push(currentFiles);
+        currentFiles = null;
       }
-      currentFiles = null;
       continue;
     }
 
