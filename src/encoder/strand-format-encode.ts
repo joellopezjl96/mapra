@@ -22,8 +22,8 @@ export function encodeToStrandFormat(graph: StrandGraph, analysis?: GraphAnalysi
   // Header
   const generated = new Date().toISOString().slice(0, 19);
   out += `STRAND v3 | ${graph.projectName} | ${capitalize(graph.framework)} | ${graph.totalFiles} files | ${graph.totalLines.toLocaleString()} lines | generated ${generated}\n`;
-  out += `LEGEND: ×N=imported by N files | ═/·=coupling strong/weak | ×A→B=A direct, B total affected | dN=cascade depth | [AMP]=amplification≥2x | TN=N test files | NL=lines of code\n`;
-  out += `USAGE: planning→RISK,CONVENTIONS,INFRASTRUCTURE | debugging→FLOWS,CHURN,HOTSPOTS | refactoring→RISK,CHURN | review→CONVENTIONS,RISK,CHURN | impact-analysis→RISK,INFRASTRUCTURE\n\n`;
+  out += `LEGEND: ×N=imported by N files | ═/·=coupling strong/weak | ×A→B=A direct, B total affected | dN=cascade depth | [AMP]=amplification≥2x | TN=N test files | NL=lines of code | Nx=co-change count | linked/no-import=import connection\n`;
+  out += `USAGE: planning→RISK,CONVENTIONS,INFRASTRUCTURE | debugging→FLOWS,CHURN,CO-CHANGE | refactoring→RISK,CHURN,CO-CHANGE | review→CONVENTIONS,RISK,CHURN | impact-analysis→RISK,CO-CHANGE\n\n`;
 
   // RISK first — highest signal for change-impact questions
   if (analysis) {
@@ -35,16 +35,22 @@ export function encodeToStrandFormat(graph: StrandGraph, analysis?: GraphAnalysi
     out += renderChurn(graph, analysis);
   }
 
-  // CONVENTIONS — detected import patterns
+  // CONVENTIONS — detected import patterns (with violations)
   if (analysis) {
     out += renderConventions(analysis);
+  }
+
+  // CO-CHANGE — files that change together in git history
+  if (analysis) {
+    out += renderCoChange(analysis);
   }
 
   // FLOWS second — relational context for navigation questions
   out += renderFlows(graph, analysis);
 
-  // HOTSPOTS + MOST IMPORTED — file-level signals
-  out += renderHotspots(graph);
+  // MOST IMPORTED — file-level signals
+  // Note: HOTSPOTS removed — Exp 11 showed zero regression (0.71 vs 0.71 baseline),
+  // and its data overlaps heavily with API ROUTES (same files, same complexity scores).
   out += renderMostImported(graph);
 
   // INFRASTRUCTURE — inter-module topology
@@ -213,6 +219,33 @@ function renderConventions(analysis: GraphAnalysis): string {
     const coverage = `${c.adoption}/${c.total} ${c.consumerType}`;
 
     out += `${label.padEnd(32)} ${coverage.padEnd(16)} ${c.anchorFile}\n`;
+
+    // Show violators for strong conventions (>= 70% adoption)
+    if (c.violators && c.violators.length > 0 && c.coverage >= 0.7) {
+      const shown = c.violators.slice(0, 5);
+      const suffix = c.violators.length > 5 ? `, +${c.violators.length - 5} more` : "";
+      const shortNames = shown.map((v) => v.split("/").pop()?.replace(/\.(ts|tsx|js|jsx)$/, "") || v);
+      out += `  exceptions: ${shortNames.join(", ")}${suffix}\n`;
+    }
+  }
+
+  out += `\n`;
+  return out;
+}
+
+function renderCoChange(analysis: GraphAnalysis): string {
+  if (!analysis.coChanges || analysis.coChanges.length === 0) return "";
+
+  let out = `─── CO-CHANGE (files that change together) ───────────────\n`;
+
+  for (const pair of analysis.coChanges) {
+    const shortA = shortenCoChangePath(pair.fileA);
+    const shortB = shortenCoChangePath(pair.fileB);
+    const freq = `${pair.coChangeCount}×`;
+    const conf = `${Math.round(pair.confidence * 100)}%`;
+    const link = pair.importConnected ? "linked" : "no-import";
+
+    out += `${freq.padEnd(5)} ${shortA} ↔ ${shortB}  (${conf} ${link})\n`;
   }
 
   out += `\n`;
@@ -267,40 +300,6 @@ function renderPages(graph: StrandGraph): string {
     const complexity = page.complexity.toFixed(2);
 
     out += `${(routePath + client).padEnd(44)} ${lines} ${complexity}\n`;
-  }
-
-  out += `\n`;
-  return out;
-}
-
-function renderHotspots(graph: StrandGraph): string {
-  const complex = graph.nodes
-    .filter(
-      (n) => n.type !== "test" && n.type !== "config" && n.complexity > 0.3,
-    )
-    .sort((a, b) => b.complexity - a.complexity)
-    .slice(0, 10);
-
-  if (complex.length === 0) return "";
-
-  let out = `─── HOTSPOTS (complexity > 0.3) ─────────────────────────\n`;
-
-  for (const node of complex) {
-    const methods =
-      node.type === "api-route"
-        ? ((node.framework?.metadata as { methods?: string[] })?.methods?.join(
-            ",",
-          ) ?? "")
-        : "";
-    const client =
-      node.type === "route" &&
-      (node.framework?.metadata as { isClientComponent?: boolean })
-        ?.isClientComponent
-        ? "[client]"
-        : "";
-    const suffix = [methods, client].filter(Boolean).join(" ");
-
-    out += `${node.complexity.toFixed(2)}  ${node.path.padEnd(52)} ${String(node.lines).padStart(4)}L ${String(node.imports.length).padStart(2)}imp ${suffix}\n`;
   }
 
   out += `\n`;
@@ -595,6 +594,18 @@ function classifyEdge(fromPath: string, toPath: string): string {
   if (/test|spec|__tests__/.test(combined)) return "test";
   if (/component|page|layout|\.tsx$/.test(combined)) return "rendering";
   return "data";
+}
+
+/**
+ * Shorten a file path for CO-CHANGE display.
+ * Uses last 2 path segments (parent/filename) to avoid ambiguity
+ * when multiple files share the same basename (e.g., route.ts).
+ */
+function shortenCoChangePath(filePath: string): string {
+  const parts = filePath.split("/");
+  return parts.length >= 2
+    ? parts.slice(-2).join("/")
+    : parts[0] ?? filePath;
 }
 
 function capitalize(s: string): string {

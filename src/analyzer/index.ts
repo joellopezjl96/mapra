@@ -13,12 +13,14 @@ import {
 } from "./blast-radius.js";
 import { type ChurnResult, computeChurn } from "./churn.js";
 import { type Convention, detectConventions } from "./conventions.js";
+import { type CoChangePair, computeCoChanges } from "./co-change.js";
 
 export interface GraphAnalysis {
   risk: BlastResult[];   // sorted by amplificationRatio desc
   deadCode: string[];    // node IDs with zero inbound edges (likely unused)
   churn: Map<string, ChurnResult>;  // per-file git churn (30d window)
   conventions: Convention[];  // import patterns adopted by 60%+ of a file type
+  coChanges: CoChangePair[];  // files that frequently change together in git history
 }
 
 /**
@@ -51,10 +53,12 @@ export function analyzeGraph(graph: StrandGraph, rootDir?: string): GraphAnalysi
 
   const churn = rootDir ? computeChurn(rootDir) : new Map<string, ChurnResult>();
   const conventions = detectConventions(graph.nodes, graph.edges);
+  const coChanges = rootDir ? computeCoChanges(rootDir, graph.edges) : [];
 
-  return { risk, deadCode, churn, conventions };
+  return { risk, deadCode, churn, conventions, coChanges };
 }
 
 export type { BlastResult } from "./blast-radius.js";
 export type { ChurnResult } from "./churn.js";
 export type { Convention } from "./conventions.js";
+export type { CoChangePair } from "./co-change.js";
