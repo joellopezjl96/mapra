@@ -15,6 +15,15 @@ import { type ChurnResult, computeChurn } from "./churn.js";
 import { type Convention, detectConventions } from "./conventions.js";
 import { type CoChangePair, computeCoChanges } from "./co-change.js";
 
+/**
+ * Returns true for files that are noise in analytical sections:
+ * - `.generated.{ts,tsx,js,jsx}` — auto-generated code
+ * - `.d.ts` — TypeScript declaration files (ambient types, not business logic)
+ */
+export function isNoiseFile(filePath: string): boolean {
+  return /\.generated\.(ts|tsx|js|jsx)$|\.d\.ts$/.test(filePath);
+}
+
 export interface GraphAnalysis {
   risk: BlastResult[];   // sorted by amplificationRatio desc
   deadCode: string[];    // node IDs with zero inbound edges (likely unused)
@@ -52,6 +61,7 @@ export function analyzeGraph(graph: StrandGraph, rootDir?: string): GraphAnalysi
     .filter(
       (n) =>
         !SKIP_TYPES.has(n.type) &&
+        !isNoiseFile(n.id) &&
         !reverseAdj.has(n.id),
     )
     .map((n) => n.id);

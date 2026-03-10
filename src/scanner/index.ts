@@ -598,19 +598,28 @@ function detectModules(
   return modules;
 }
 
+function percentile(sorted: number[], p: number): number {
+  if (sorted.length === 0) return 0;
+  if (sorted.length === 1) return sorted[0]!;
+  const idx = (p / 100) * (sorted.length - 1);
+  const lo = Math.floor(idx);
+  const hi = Math.ceil(idx);
+  if (lo === hi) return sorted[lo]!;
+  return sorted[lo]! + (sorted[hi]! - sorted[lo]!) * (idx - lo);
+}
+
 function calculateComplexity(nodes: StrandNode[]): void {
   if (nodes.length === 0) return;
 
-  const maxLines = nodes.reduce((max, n) => (n.lines > max ? n.lines : max), 0);
-  const maxImports = nodes.reduce(
-    (max, n) => (n.imports.length > max ? n.imports.length : max),
-    0,
-  );
+  const sortedLines = nodes.map(n => n.lines).sort((a, b) => a - b);
+  const sortedImports = nodes.map(n => n.imports.length).sort((a, b) => a - b);
+
+  const p95Lines = percentile(sortedLines, 95);
+  const p95Imports = percentile(sortedImports, 95);
 
   for (const node of nodes) {
-    // Simple complexity: weighted combination of lines and import count
-    const lineScore = maxLines > 0 ? node.lines / maxLines : 0;
-    const importScore = maxImports > 0 ? node.imports.length / maxImports : 0;
-    node.complexity = lineScore * 0.6 + importScore * 0.4;
+    const lineScore = p95Lines > 0 ? Math.min(node.lines / p95Lines, 1.0) : 0;
+    const importScore = p95Imports > 0 ? Math.min(node.imports.length / p95Imports, 1.0) : 0;
+    node.complexity = Math.round((lineScore * 0.6 + importScore * 0.4) * 100) / 100;
   }
 }

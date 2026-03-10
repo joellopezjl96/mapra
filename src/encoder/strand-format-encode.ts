@@ -48,7 +48,7 @@ export function encodeToStrandFormat(graph: StrandGraph, analysis?: GraphAnalysi
 
   // CO-CHANGE — files that change together in git history
   if (analysis) {
-    out += renderCoChange(analysis);
+    out += renderCoChange(graph, analysis);
   }
 
   // FLOWS second — relational context for navigation questions
@@ -193,9 +193,12 @@ function renderRisk(graph: StrandGraph, analysis: GraphAnalysis): string {
 function renderChurn(graph: StrandGraph, analysis: GraphAnalysis): string {
   if (!analysis.churn || analysis.churn.size === 0) return "";
 
+  // Only show files that exist in the scanner graph (filters out .md, lock files, .strand, etc.)
+  const graphNodeIds = new Set(graph.nodes.map(n => n.id));
+
   // Get files with >= 3 commits (high churn)
   const highChurn = [...analysis.churn.values()]
-    .filter((c) => c.commits30d >= 3)
+    .filter((c) => c.commits30d >= 3 && graphNodeIds.has(c.nodeId))
     .sort((a, b) => b.commits30d - a.commits30d)
     .slice(0, 10);
 
@@ -244,12 +247,20 @@ function renderConventions(analysis: GraphAnalysis): string {
   return out;
 }
 
-function renderCoChange(analysis: GraphAnalysis): string {
+function renderCoChange(graph: StrandGraph, analysis: GraphAnalysis): string {
   if (!analysis.coChanges || analysis.coChanges.length === 0) return "";
+
+  // Only show pairs where BOTH files exist in the scanner graph
+  const graphNodeIds = new Set(graph.nodes.map(n => n.id));
+  const filtered = analysis.coChanges.filter(
+    pair => graphNodeIds.has(pair.fileA) && graphNodeIds.has(pair.fileB),
+  );
+
+  if (filtered.length === 0) return "";
 
   let out = `─── CO-CHANGE (files that change together) ───────────────\n`;
 
-  for (const pair of analysis.coChanges) {
+  for (const pair of filtered) {
     const shortA = shortenCoChangePath(pair.fileA);
     const shortB = shortenCoChangePath(pair.fileB);
     const freq = `${pair.coChangeCount}×`;
@@ -266,7 +277,7 @@ function renderCoChange(analysis: GraphAnalysis): string {
 function renderApiRoutes(graph: StrandGraph): string {
   const apiRoutes = graph.nodes
     .filter((n) => n.type === "api-route")
-    .sort((a, b) => b.complexity - a.complexity);
+    .sort((a, b) => b.complexity - a.complexity || b.lines - a.lines);
 
   if (apiRoutes.length === 0) return "";
 
@@ -293,7 +304,7 @@ function renderApiRoutes(graph: StrandGraph): string {
 function renderPages(graph: StrandGraph): string {
   const pages = graph.nodes
     .filter((n) => n.type === "route")
-    .sort((a, b) => b.complexity - a.complexity);
+    .sort((a, b) => b.complexity - a.complexity || b.lines - a.lines);
 
   if (pages.length === 0) return "";
 
@@ -464,7 +475,7 @@ function renderFlows(graph: StrandGraph, analysis?: GraphAnalysis): string {
   // 2. Find entry points: API routes with outgoing cross-sub-module edges
   const entryPoints = graph.nodes
     .filter((n) => n.type === "api-route" && adj.has(n.id))
-    .sort((a, b) => b.complexity - a.complexity);
+    .sort((a, b) => b.complexity - a.complexity || b.lines - a.lines);
 
   // SPA fallback: no API routes — use top hub files by amplification ratio
   if (entryPoints.length === 0) {
