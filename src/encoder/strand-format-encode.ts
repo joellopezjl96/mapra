@@ -48,7 +48,7 @@ export function encodeToStrandFormat(graph: StrandGraph, analysis?: GraphAnalysi
 
   // CO-CHANGE — files that change together in git history
   if (analysis) {
-    out += renderCoChange(analysis);
+    out += renderCoChange(graph, analysis);
   }
 
   // FLOWS second — relational context for navigation questions
@@ -247,12 +247,20 @@ function renderConventions(analysis: GraphAnalysis): string {
   return out;
 }
 
-function renderCoChange(analysis: GraphAnalysis): string {
+function renderCoChange(graph: StrandGraph, analysis: GraphAnalysis): string {
   if (!analysis.coChanges || analysis.coChanges.length === 0) return "";
+
+  // Only show pairs where BOTH files exist in the scanner graph
+  const graphNodeIds = new Set(graph.nodes.map(n => n.id));
+  const filtered = analysis.coChanges.filter(
+    pair => graphNodeIds.has(pair.fileA) && graphNodeIds.has(pair.fileB),
+  );
+
+  if (filtered.length === 0) return "";
 
   let out = `─── CO-CHANGE (files that change together) ───────────────\n`;
 
-  for (const pair of analysis.coChanges) {
+  for (const pair of filtered) {
     const shortA = shortenCoChangePath(pair.fileA);
     const shortB = shortenCoChangePath(pair.fileB);
     const freq = `${pair.coChangeCount}×`;

@@ -3,6 +3,7 @@ import { encodeToStrandFormat } from "../strand-format-encode.js";
 import type { StrandGraph } from "../../scanner/index.js";
 import type { GraphAnalysis } from "../../analyzer/index.js";
 import type { ChurnResult } from "../../analyzer/churn.js";
+import type { CoChangePair } from "../../analyzer/co-change.js";
 
 function makeGraph(nodeIds: string[]): StrandGraph {
   return {
@@ -107,5 +108,83 @@ describe("CHURN graph-membership filter", () => {
     const output = encodeToStrandFormat(graph, analysis);
     // No CHURN section at all when all entries are filtered out
     expect(output).not.toContain("─── CHURN");
+  });
+});
+
+function makeCoChangePair(fileA: string, fileB: string, count: number, importConnected: boolean): CoChangePair {
+  return {
+    fileA,
+    fileB,
+    coChangeCount: count,
+    confidence: 0.8,
+    importConnected,
+  };
+}
+
+function extractCoChangeSection(output: string): string {
+  const lines = output.split("\n");
+  const startIdx = lines.findIndex(l => l.startsWith("─── CO-CHANGE"));
+  if (startIdx === -1) return "";
+  const sectionLines: string[] = [];
+  for (let i = startIdx + 1; i < lines.length; i++) {
+    if (lines[i]!.startsWith("───")) break;
+    sectionLines.push(lines[i]!);
+  }
+  return sectionLines.join("\n");
+}
+
+describe("CO-CHANGE graph-membership filter", () => {
+  it("only includes pairs where both files exist in the scanner graph", () => {
+    const graph = makeGraph([
+      "src/lib/utils.ts",
+      "src/cli/index.ts",
+      "src/encoder/strand-format-encode.ts",
+    ]);
+
+    const analysis: GraphAnalysis = {
+      risk: [],
+      deadCode: [],
+      churn: new Map(),
+      conventions: [],
+      coChanges: [
+        // Both in graph — should appear
+        makeCoChangePair("src/lib/utils.ts", "src/cli/index.ts", 5, true),
+        // Both NOT in graph — should be filtered
+        makeCoChangePair("package.json", "yarn.lock", 10, false),
+        // One in graph, one not — should be filtered
+        makeCoChangePair("src/lib/utils.ts", "README.md", 4, false),
+      ],
+    };
+
+    const output = encodeToStrandFormat(graph, analysis);
+    const coChangeSection = extractCoChangeSection(output);
+
+    // Valid pair (both in graph) SHOULD appear
+    expect(coChangeSection).toContain("utils.ts");
+    expect(coChangeSection).toContain("cli/index.ts");
+
+    // Invalid pairs should NOT appear
+    expect(coChangeSection).not.toContain("package.json");
+    expect(coChangeSection).not.toContain("yarn.lock");
+    expect(coChangeSection).not.toContain("README.md");
+  });
+
+  it("renders empty when all co-change pairs have non-graph files", () => {
+    const graph = makeGraph(["src/cli/index.ts"]);
+
+    const analysis: GraphAnalysis = {
+      risk: [],
+      deadCode: [],
+      churn: new Map(),
+      conventions: [],
+      coChanges: [
+        makeCoChangePair("package.json", "yarn.lock", 10, false),
+        makeCoChangePair("README.md", "CHANGELOG.md", 5, false),
+      ],
+    };
+
+    const output = encodeToStrandFormat(graph, analysis);
+    // No CO-CHANGE section at all when all pairs are filtered out
+    expect(output).not.toContain("─── CO-CHANGE");
   });
 });
