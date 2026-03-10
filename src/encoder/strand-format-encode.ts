@@ -277,7 +277,7 @@ function renderCoChange(graph: StrandGraph, analysis: GraphAnalysis): string {
 function renderApiRoutes(graph: StrandGraph): string {
   const apiRoutes = graph.nodes
     .filter((n) => n.type === "api-route")
-    .sort((a, b) => b.complexity - a.complexity);
+    .sort((a, b) => b.complexity - a.complexity || b.lines - a.lines);
 
   if (apiRoutes.length === 0) return "";
 
@@ -304,7 +304,7 @@ function renderApiRoutes(graph: StrandGraph): string {
 function renderPages(graph: StrandGraph): string {
   const pages = graph.nodes
     .filter((n) => n.type === "route")
-    .sort((a, b) => b.complexity - a.complexity);
+    .sort((a, b) => b.complexity - a.complexity || b.lines - a.lines);
 
   if (pages.length === 0) return "";
 
@@ -475,7 +475,7 @@ function renderFlows(graph: StrandGraph, analysis?: GraphAnalysis): string {
   // 2. Find entry points: API routes with outgoing cross-sub-module edges
   const entryPoints = graph.nodes
     .filter((n) => n.type === "api-route" && adj.has(n.id))
-    .sort((a, b) => b.complexity - a.complexity);
+    .sort((a, b) => b.complexity - a.complexity || b.lines - a.lines);
 
   // SPA fallback: no API routes — use top hub files by amplification ratio
   if (entryPoints.length === 0) {
