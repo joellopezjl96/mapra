@@ -193,9 +193,12 @@ function renderRisk(graph: StrandGraph, analysis: GraphAnalysis): string {
 function renderChurn(graph: StrandGraph, analysis: GraphAnalysis): string {
   if (!analysis.churn || analysis.churn.size === 0) return "";
 
+  // Only show files that exist in the scanner graph (filters out .md, lock files, .strand, etc.)
+  const graphNodeIds = new Set(graph.nodes.map(n => n.id));
+
   // Get files with >= 3 commits (high churn)
   const highChurn = [...analysis.churn.values()]
-    .filter((c) => c.commits30d >= 3)
+    .filter((c) => c.commits30d >= 3 && graphNodeIds.has(c.nodeId))
     .sort((a, b) => b.commits30d - a.commits30d)
     .slice(0, 10);
 
