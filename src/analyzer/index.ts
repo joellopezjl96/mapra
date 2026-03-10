@@ -61,6 +61,7 @@ export function analyzeGraph(graph: StrandGraph, rootDir?: string): GraphAnalysi
     .filter(
       (n) =>
         !SKIP_TYPES.has(n.type) &&
+        !isNoiseFile(n.id) &&
         !reverseAdj.has(n.id),
     )
     .map((n) => n.id);
