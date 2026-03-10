@@ -48,8 +48,8 @@ function makeGraph(
                   routePath: n.routePath ?? n.id,
                 },
               }
-            : undefined,
-    })),
+            : (null as unknown as undefined),
+    })).map(({ framework, ...rest }) => framework ? { ...rest, framework } : rest),
     edges: [],
   };
 }

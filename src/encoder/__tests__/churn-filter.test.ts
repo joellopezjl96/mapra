@@ -116,6 +116,8 @@ function makeCoChangePair(fileA: string, fileB: string, count: number, importCon
     fileA,
     fileB,
     coChangeCount: count,
+    totalCommitsA: count + 2,
+    totalCommitsB: count + 1,
     confidence: 0.8,
     importConnected,
   };
