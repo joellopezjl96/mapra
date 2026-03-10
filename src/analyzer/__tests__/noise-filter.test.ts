@@ -26,6 +26,14 @@ describe("isNoiseFile", () => {
     expect(isNoiseFile("src/components/Button.tsx")).toBe(false);
   });
 
+  it("matches .generated.js files", () => {
+    expect(isNoiseFile("dist/codegen/schema.generated.js")).toBe(true);
+  });
+
+  it("matches .generated.jsx files", () => {
+    expect(isNoiseFile("src/components/Icons.generated.jsx")).toBe(true);
+  });
+
   it("does NOT match files with 'generated' in directory name", () => {
     expect(isNoiseFile("src/generated/utils.ts")).toBe(false);
   });

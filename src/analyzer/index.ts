@@ -17,11 +17,11 @@ import { type CoChangePair, computeCoChanges } from "./co-change.js";
 
 /**
  * Returns true for files that are noise in analytical sections:
- * - `.generated.ts/.tsx` — auto-generated code
+ * - `.generated.{ts,tsx,js,jsx}` — auto-generated code
  * - `.d.ts` — TypeScript declaration files (ambient types, not business logic)
  */
 export function isNoiseFile(filePath: string): boolean {
-  return /\.generated\.tsx?$|\.d\.ts$/.test(filePath);
+  return /\.generated\.(ts|tsx|js|jsx)$|\.d\.ts$/.test(filePath);
 }
 
 export interface GraphAnalysis {
