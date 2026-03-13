@@ -52,10 +52,10 @@ export function detectWorkspaceAliases(scanRoot: string): WorkspaceContext {
         console.warn(`Duplicate workspace name '${name}' at ${packages.get(name)!.dir} and ${dir}, keeping first`);
         continue;
       }
-      packages.set(name, {
-        dir: toForwardSlash(dir),
-        entryPoint: extractEntryPoint(pkg),
-      });
+      const entryPoint = extractEntryPoint(pkg);
+      const ws: WorkspacePackage = { dir: toForwardSlash(dir) };
+      if (entryPoint) ws.entryPoint = entryPoint;
+      packages.set(name, ws);
     } catch (err) {
       console.warn(`Skipping workspace at ${dir}: ${err instanceof Error ? err.message : err}`);
       continue;
