@@ -11,3 +11,5 @@ scripts/
 .env.local
 *.log
 .worktrees/
+*.tgz
+nul
