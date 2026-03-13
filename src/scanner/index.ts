@@ -7,6 +7,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
+import { detectWorkspaceAliases, resolveWorkspaceImport } from "./workspace.js";
 
 export interface StrandNode {
   id: string;
@@ -431,10 +432,18 @@ function resolveEdges(
 ): void {
   const nodeMap = new Map(nodes.map((n) => [n.id, n]));
   const pathAliases = detectPathAliases(rootDir);
+  const workspaceCtx = detectWorkspaceAliases(rootDir);
+  const hasNode = (id: string): boolean => !!findNodeByImport(id, nodeMap);
 
   for (const node of nodes) {
     for (const importPath of node.imports) {
-      const resolvedId = resolveImportPath(importPath, node.path, pathAliases);
+      let resolvedId = resolveImportPath(importPath, node.path, pathAliases);
+
+      // Fallback to workspace resolution
+      if (!resolvedId && workspaceCtx.packages.size > 0) {
+        resolvedId = resolveWorkspaceImport(importPath, workspaceCtx, hasNode);
+      }
+
       if (resolvedId) {
         // Find the actual node (try with various extensions)
         const target = findNodeByImport(resolvedId, nodeMap);
