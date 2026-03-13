@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
-import { detectWorkspaceAliases } from "../workspace.js";
+import { detectWorkspaceAliases, resolveWorkspaceImport, type WorkspaceContext } from "../workspace.js";
 
 function makeTmp(prefix: string): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), `strand-ws-${prefix}-`));
@@ -405,5 +405,171 @@ describe("detectWorkspaceAliases", () => {
 
     expect(ctx.packages.size).toBe(1);
     expect(ctx.packages.has("@mono/good")).toBe(true);
+  });
+});
+
+function makeCtx(
+  packages: Record<string, { dir: string; entryPoint?: string }>,
+  rootOffset = "",
+): WorkspaceContext {
+  const map = new Map<string, { dir: string; entryPoint?: string }>();
+  for (const [name, pkg] of Object.entries(packages)) map.set(name, pkg);
+  return { packages: map, rootOffset };
+}
+
+describe("resolveWorkspaceImport", () => {
+  // --- Basic resolution ---
+
+  it("resolves scoped package with subpath", () => {
+    const ctx = makeCtx({ "@scope/lib": { dir: "packages/lib" } });
+    const hasNode = () => true;
+
+    expect(resolveWorkspaceImport("@scope/lib/auth", ctx, hasNode)).toBe(
+      "packages/lib/auth",
+    );
+  });
+
+  it("resolves deep nested subpath", () => {
+    const ctx = makeCtx({ "@scope/lib": { dir: "packages/lib" } });
+    const hasNode = () => true;
+
+    expect(resolveWorkspaceImport("@scope/lib/hooks/useAuth", ctx, hasNode)).toBe(
+      "packages/lib/hooks/useAuth",
+    );
+  });
+
+  it("resolves bare import to entry point", () => {
+    const ctx = makeCtx({
+      "@scope/ui": { dir: "packages/ui", entryPoint: "src/index.ts" },
+    });
+    const hasNode = () => true;
+
+    expect(resolveWorkspaceImport("@scope/ui", ctx, hasNode)).toBe(
+      "packages/ui/src/index.ts",
+    );
+  });
+
+  it("resolves bare import with no entry point to index", () => {
+    const ctx = makeCtx({ "@scope/lib": { dir: "packages/lib" } });
+    const hasNode = () => true;
+
+    expect(resolveWorkspaceImport("@scope/lib", ctx, hasNode)).toBe(
+      "packages/lib/index",
+    );
+  });
+
+  it("returns null for unknown package", () => {
+    const ctx = makeCtx({ "@scope/lib": { dir: "packages/lib" } });
+    const hasNode = () => true;
+
+    expect(resolveWorkspaceImport("@other/pkg/foo", ctx, hasNode)).toBeNull();
+  });
+
+  // --- Boundary safety and longest match ---
+
+  it("does not match package prefix that is a partial name", () => {
+    const ctx = makeCtx({
+      "@scope/app-store": { dir: "packages/app-store" },
+      "@scope/app-store-cli": { dir: "packages/app-store-cli" },
+    });
+    const hasNode = () => true;
+
+    expect(resolveWorkspaceImport("@scope/app-store-cli/run", ctx, hasNode)).toBe(
+      "packages/app-store-cli/run",
+    );
+  });
+
+  it("uses longest matching package name", () => {
+    const ctx = makeCtx({
+      "@scope/lib": { dir: "packages/lib" },
+      "@scope/lib-extra": { dir: "packages/lib-extra" },
+    });
+    const hasNode = () => true;
+
+    expect(resolveWorkspaceImport("@scope/lib-extra/utils", ctx, hasNode)).toBe(
+      "packages/lib-extra/utils",
+    );
+  });
+
+  // --- rootOffset adjustment ---
+
+  it("returns path as-is when rootOffset is empty", () => {
+    const ctx = makeCtx(
+      { "@scope/lib": { dir: "packages/lib" } },
+      "",
+    );
+    const hasNode = () => true;
+
+    expect(resolveWorkspaceImport("@scope/lib/auth", ctx, hasNode)).toBe(
+      "packages/lib/auth",
+    );
+  });
+
+  it("strips rootOffset prefix from resolved path", () => {
+    const ctx = makeCtx(
+      { "@scope/lib": { dir: "apps/web/lib" } },
+      "apps/web",
+    );
+    const hasNode = () => true;
+
+    expect(resolveWorkspaceImport("@scope/lib/auth", ctx, hasNode)).toBe(
+      "lib/auth",
+    );
+  });
+
+  it("returns null when resolved path is outside scan root", () => {
+    const ctx = makeCtx(
+      { "@scope/other": { dir: "packages/other" } },
+      "apps/web",
+    );
+    const hasNode = () => true;
+
+    // packages/other/foo does NOT start with "apps/web/"
+    expect(resolveWorkspaceImport("@scope/other/foo", ctx, hasNode)).toBeNull();
+  });
+
+  // --- src/ fallback ---
+
+  it("falls back to src/ prefix when primary path has no node", () => {
+    const ctx = makeCtx({ "@scope/testing": { dir: "packages/testing" } });
+    const nodes = new Set(["packages/testing/src/lib/mock"]);
+    const hasNode = (id: string) => nodes.has(id);
+
+    // Primary: packages/testing/lib/mock — not in nodes
+    // Fallback: packages/testing/src/lib/mock — in nodes
+    expect(resolveWorkspaceImport("@scope/testing/lib/mock", ctx, hasNode)).toBe(
+      "packages/testing/src/lib/mock",
+    );
+  });
+
+  it("does not trigger src/ fallback when primary path has a node", () => {
+    const ctx = makeCtx({ "@scope/lib": { dir: "packages/lib" } });
+    const nodes = new Set(["packages/lib/hooks/useLocale"]);
+    const hasNode = (id: string) => nodes.has(id);
+
+    expect(resolveWorkspaceImport("@scope/lib/hooks/useLocale", ctx, hasNode)).toBe(
+      "packages/lib/hooks/useLocale",
+    );
+  });
+
+  it("does not apply src/ fallback to bare imports", () => {
+    const ctx = makeCtx({ "@scope/lib": { dir: "packages/lib" } });
+    // hasNode returns false for everything — src/ fallback should NOT fire for bare
+    const hasNode = () => false;
+
+    expect(resolveWorkspaceImport("@scope/lib", ctx, hasNode)).toBe(
+      "packages/lib/index",
+    );
+  });
+
+  it("returns primary path when neither primary nor src/ fallback has a node", () => {
+    const ctx = makeCtx({ "@scope/lib": { dir: "packages/lib" } });
+    const hasNode = () => false;
+
+    // Neither packages/lib/foo nor packages/lib/src/foo has a node
+    // Should still return primary path (let caller handle)
+    expect(resolveWorkspaceImport("@scope/lib/foo", ctx, hasNode)).toBe(
+      "packages/lib/foo",
+    );
   });
 });

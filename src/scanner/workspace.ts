@@ -210,5 +210,61 @@ export function resolveWorkspaceImport(
   ctx: WorkspaceContext,
   hasNode: (id: string) => boolean,
 ): string | null {
-  return null; // stub — implemented in Task 3
+  // 1. Find longest matching workspace package
+  let matchedName: string | null = null;
+  let matchedPkg: WorkspacePackage | null = null;
+
+  for (const [name, pkg] of ctx.packages) {
+    const isMatch =
+      importPath === name || importPath.startsWith(name + "/");
+    if (isMatch && (matchedName === null || name.length > matchedName.length)) {
+      matchedName = name;
+      matchedPkg = pkg;
+    }
+  }
+
+  if (!matchedName || !matchedPkg) return null;
+
+  // 2. Split into package name + subpath
+  const subpath =
+    importPath.length > matchedName.length
+      ? importPath.slice(matchedName.length + 1) // skip the "/"
+      : null;
+
+  // 3. Resolve to file path
+  let resolvedPath: string;
+
+  if (subpath) {
+    resolvedPath = matchedPkg.dir + "/" + subpath;
+  } else {
+    // Bare import
+    resolvedPath = matchedPkg.entryPoint
+      ? matchedPkg.dir + "/" + matchedPkg.entryPoint
+      : matchedPkg.dir + "/index";
+  }
+
+  // 4. Adjust for rootOffset
+  const adjusted = adjustForRootOffset(resolvedPath, ctx.rootOffset);
+  if (adjusted === null) return null;
+
+  // 5. src/ fallback (subpath only)
+  if (subpath && !hasNode(adjusted)) {
+    const srcPath = matchedPkg.dir + "/src/" + subpath;
+    const srcAdjusted = adjustForRootOffset(srcPath, ctx.rootOffset);
+    if (srcAdjusted !== null && hasNode(srcAdjusted)) {
+      return srcAdjusted;
+    }
+  }
+
+  return adjusted;
+}
+
+function adjustForRootOffset(
+  resolvedPath: string,
+  rootOffset: string,
+): string | null {
+  if (rootOffset === "") return resolvedPath;
+  const prefix = rootOffset + "/";
+  if (resolvedPath.startsWith(prefix)) return resolvedPath.slice(prefix.length);
+  return null; // outside scan root
 }
