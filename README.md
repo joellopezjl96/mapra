@@ -57,6 +57,21 @@ LEGEND: ×N=imported by N files | ×A→B=A direct, B total affected | dN=cascad
 
 The RISK section is strnd's unique value — it shows **hidden amplifiers**: files with few direct importers but high cascade impact. `constants.ts` above has only 3 direct importers but affects 21 files (amp 7.0). No other tool surfaces this.
 
+### Reading the output
+
+The `.strand` header includes a LEGEND that decodes the compact notation:
+
+| Symbol | Meaning | Example |
+|--------|---------|---------|
+| `×N` | Imported by N files | `×3` = 3 files import this |
+| `×A→B` | A direct importers, B total affected (cascade) | `×3→21` = 3 direct, 21 total |
+| `[AMP]` | Hidden amplifier — amplification ratio >= 2x | Few importers but large cascade |
+| `ampN` | Amplification ratio (affected / direct) | `amp7.0` = 7x amplification |
+| `dN` | Cascade depth (longest chain) | `d3` = 3 hops max |
+| `Nmod` | Number of modules affected | `3mod` = crosses 3 module boundaries |
+| `TN` | Number of test files covering this file | `T5` = 5 test files |
+| `NL` | Lines of code | `543L` = 543 lines |
+
 ## Commands
 
 ```
