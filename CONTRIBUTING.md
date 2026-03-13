@@ -4,7 +4,7 @@
 
 ```bash
 git clone https://github.com/joellopezjl96/strand.git
-cd strnd
+cd strand
 npm install
 npm test
 ```
