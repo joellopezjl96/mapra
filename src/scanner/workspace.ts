@@ -172,10 +172,11 @@ function walkForPackages(dir: string, rootDir: string): string[] {
 }
 
 function matchGlob(value: string, pattern: string): boolean {
-  const regex = new RegExp(
-    "^" + pattern.replace(/\*\*/g, ".*").replace(/\*/g, "[^/]*") + "$",
-  );
-  return regex.test(value);
+  const escaped = pattern
+    .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
+    .replace(/\\\*\\\*/g, ".*")
+    .replace(/\\\*/g, "[^/]*");
+  return new RegExp("^" + escaped + "$").test(value);
 }
 
 function extractEntryPoint(pkg: Record<string, unknown>): string | undefined {
