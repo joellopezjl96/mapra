@@ -24,6 +24,23 @@ export function isNoiseFile(filePath: string): boolean {
   return /\.generated\.(ts|tsx|js|jsx)$|\.d\.ts$/.test(filePath);
 }
 
+/**
+ * Files managed by dependency injection — typed as utility but not dead code.
+ * These are loaded by DI containers (NestJS, Angular) at runtime, not via
+ * static imports, so they have zero inbound edges in the import graph.
+ */
+const DI_ENTRY_PATTERNS = [
+  /\.service\.(ts|js)$/,
+  /\.repository\.(ts|js)$/,
+  /\.resolver\.(ts|js)$/,
+  /\.gateway\.(ts|js)$/,
+  /\.subscriber\.(ts|js)$/,
+];
+
+function isDiEntryPoint(filePath: string): boolean {
+  return DI_ENTRY_PATTERNS.some(re => re.test(filePath));
+}
+
 export interface GraphAnalysis {
   risk: BlastResult[];   // sorted by amplificationRatio desc
   deadCode: string[];    // node IDs with zero inbound edges (likely unused)
@@ -62,6 +79,7 @@ export function analyzeGraph(graph: StrandGraph, rootDir?: string): GraphAnalysi
       (n) =>
         !SKIP_TYPES.has(n.type) &&
         !isNoiseFile(n.id) &&
+        !isDiEntryPoint(n.id) &&
         !reverseAdj.has(n.id),
     )
     .map((n) => n.id);
