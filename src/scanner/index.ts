@@ -138,6 +138,7 @@ function detectFramework(rootDir: string): FrameworkInfo {
     const srcDir = fs.existsSync(path.join(rootDir, "src")) ? "src" : "";
     return { name: "nextjs", type: "Next.js", srcDir };
   }
+  if (deps["@nestjs/core"]) return { name: "nestjs", type: "NestJS", srcDir: "src" };
   if (deps["express"]) return { name: "express", type: "Express", srcDir: "" };
   if (deps["react"]) return { name: "react", type: "React", srcDir: "src" };
   if (deps["vue"]) return { name: "vue", type: "Vue", srcDir: "src" };
@@ -259,6 +260,30 @@ function isSourceFile(name: string): boolean {
   return /\.(ts|tsx|js|jsx|mjs|cjs|prisma)$/.test(name);
 }
 
+interface EntryPointPattern {
+  match: RegExp;
+  type: StrandNode["type"];
+  /** Optional: only fire if detected framework matches. Fires unconditionally if omitted. */
+  frameworks?: string[];
+}
+
+const ENTRY_POINT_PATTERNS: EntryPointPattern[] = [
+  // Next.js App Router — fire unconditionally (filenames are globally unambiguous)
+  { match: /\/api\/.*route\.(ts|js)$/, type: "api-route" },
+  { match: /\/page\.(tsx|jsx|ts|js)$/, type: "route" },
+  { match: /\/layout\.(tsx|jsx|ts|js)$/, type: "layout" },
+  { match: /\/(loading|error|not-found|template|default|global-error)\.(tsx|jsx|ts|js)$/, type: "route" },
+  { match: /middleware\.(ts|js)$/, type: "middleware" },
+
+  // NestJS — filenames are distinctive enough to fire unconditionally.
+  { match: /\.controller\.(ts|js)$/, type: "route" },
+  { match: /\.module\.(ts|js)$/, type: "config" },
+  { match: /\.guard\.(ts|js)$/, type: "middleware" },
+  { match: /\.interceptor\.(ts|js)$/, type: "middleware" },
+  { match: /\.pipe\.(ts|js)$/, type: "middleware" },
+  { match: /\.filter\.(ts|js)$/, type: "middleware" },
+];
+
 function classifyFile(
   relativePath: string,
   content: string,
@@ -286,13 +311,10 @@ function classifyFile(
   // Prisma schema
   if (normalized.endsWith(".prisma")) return "schema";
 
-  // Next.js specific
-  if (framework.name === "nextjs") {
-    if (/\/api\/.*route\.(ts|js)$/.test(normalized)) return "api-route";
-    if (/\/page\.(tsx|jsx|ts|js)$/.test(normalized)) return "route";
-    if (/\/layout\.(tsx|jsx|ts|js)$/.test(normalized)) return "layout";
-    if (/\/(loading|error|not-found|template|default|global-error)\.(tsx|jsx|ts|js)$/.test(normalized)) return "route";
-    if (/middleware\.(ts|js)$/.test(normalized)) return "middleware";
+  // Framework entry points — fire unconditionally unless gated by `frameworks` field
+  for (const pattern of ENTRY_POINT_PATTERNS) {
+    if (pattern.frameworks && !pattern.frameworks.includes(framework.name)) continue;
+    if (pattern.match.test(normalized)) return pattern.type;
   }
 
   // React components (files with JSX exports)
@@ -472,7 +494,7 @@ function resolveEdges(
   }
 }
 
-function detectPathAliases(rootDir: string): Map<string, string> {
+export function detectPathAliases(rootDir: string): Map<string, string> {
   const aliases = new Map<string, string>();
   const tsconfigPath = path.join(rootDir, "tsconfig.json");
 
@@ -502,7 +524,7 @@ function detectPathAliases(rootDir: string): Map<string, string> {
   return aliases;
 }
 
-function resolveImportPath(
+export function resolveImportPath(
   importPath: string,
   fromPath: string,
   aliases: Map<string, string>,
@@ -538,7 +560,7 @@ function resolveImportPath(
   return importPath;
 }
 
-function findNodeByImport(
+export function findNodeByImport(
   resolvedPath: string,
   nodeMap: Map<string, StrandNode>,
 ): StrandNode | null {
