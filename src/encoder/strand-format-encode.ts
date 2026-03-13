@@ -135,8 +135,46 @@ function renderRisk(graph: StrandGraph, analysis: GraphAnalysis): string {
     graph.nodes.filter(n => n.type === "test").map(n => n.id),
   );
   const filtered = analysis.risk.filter(r => !testNodeIds.has(r.nodeId));
-  const top = filtered.slice(0, 8);
-  if (top.length === 0) return "";
+  if (filtered.length === 0) return "";
+
+  // Tiered selection: Tier 1 (top 5) + Tier 2 (3 mid-level from remaining modules)
+  const TIER1_SLOTS = 5;
+  const TIER2_SLOTS = 3;
+
+  const tier1: Array<{ entry: typeof filtered[0]; similarCount: number }> = [];
+  const tier1Modules = new Map<string, number>(); // moduleId -> index in tier1
+  let tier1Collapsed = 0;
+
+  // Fill Tier 1 with highest-amp entries (module-deduped)
+  for (const r of filtered) {
+    const mod = getModuleId(r.nodeId);
+    const existingIdx = tier1Modules.get(mod);
+
+    if (existingIdx !== undefined) {
+      tier1[existingIdx]!.similarCount++;
+      tier1Collapsed++;
+    } else if (tier1.length < TIER1_SLOTS) {
+      tier1Modules.set(mod, tier1.length);
+      tier1.push({ entry: r, similarCount: 0 });
+    }
+  }
+
+  // Fill Tier 2 from remaining entries not in Tier 1 modules
+  const tier2: Array<{ entry: typeof filtered[0]; similarCount: number }> = [];
+  const tier2Modules = new Set<string>();
+
+  for (const r of filtered) {
+    const mod = getModuleId(r.nodeId);
+    if (tier1Modules.has(mod)) continue; // Skip Tier 1 modules entirely
+    if (tier2Modules.has(mod)) continue; // Already have this module in Tier 2
+    if (tier2.length >= TIER2_SLOTS) break;
+
+    tier2Modules.add(mod);
+    tier2.push({ entry: r, similarCount: 0 });
+  }
+
+  const selected = [...tier1, ...tier2];
+  if (selected.length === 0) return "";
 
   // Build node lookup and test edge counts
   const nodeMap = new Map(graph.nodes.map((n) => [n.id, n]));
@@ -149,7 +187,13 @@ function renderRisk(graph: StrandGraph, analysis: GraphAnalysis): string {
 
   let out = `─── RISK (blast radius — modifying these cascades broadly) ─\n`;
 
-  for (const r of top) {
+  for (let i = 0; i < selected.length; i++) {
+    // Blank line separator between Tier 1 and Tier 2
+    if (i === tier1.length && tier2.length > 0) {
+      out += `\n`;
+    }
+
+    const { entry: r, similarCount } = selected[i]!;
     const isAmplified = r.amplificationRatio >= 2.0;
     const marker = isAmplified ? "[AMP]" : "     ";
     const amp = `amp${r.amplificationRatio.toFixed(1)}`.padEnd(7);
@@ -179,9 +223,14 @@ function renderRisk(graph: StrandGraph, analysis: GraphAnalysis): string {
       const suffix = exports.length > 5 ? `, +${exports.length - 5} more` : "";
       out += `  exports: ${shown.join(", ")}${suffix}\n`;
     }
+
+    // +N similar line for collapsed entries from same module
+    if (similarCount > 0) {
+      out += `  +${similarCount} similar in ${getModuleId(r.nodeId)}\n`;
+    }
   }
 
-  const remaining = filtered.length - top.length;
+  const remaining = filtered.length - selected.length - tier1Collapsed;
   if (remaining > 0) {
     out += `  +${remaining} more with blast radius > 1\n`;
   }
