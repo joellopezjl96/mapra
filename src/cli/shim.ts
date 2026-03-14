@@ -23,7 +23,7 @@ export function generateHookShim(version: string): string {
     `  execFileSync("npx", ["strnd", "generate", "--silent"], {`,
     `    timeout: 30000,`,
     `    stdio: "ignore",`,
-    `    shell: true,`,
+    `    shell: false,`,
     `  });`,
     `} catch { /* silent failure — stale .strand beats broken commits */ }`,
     `finally { try { unlinkSync(LOCK); } catch {} }`,
