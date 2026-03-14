@@ -13,3 +13,9 @@ scripts/
 .worktrees/
 *.tgz
 nul
+
+# Internal docs — design plans, experiment data, findings
+docs/plans/
+experiments/configs/
+experiments/experiments/
+FINDINGS.md
