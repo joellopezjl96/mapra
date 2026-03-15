@@ -20,6 +20,9 @@ export interface Condition {
   includeUsageLine?: boolean;
   excludeSections?: string[];
   trials?: number;
+  enableTools?: boolean;
+  /** Prepended to the question for this condition (e.g., strategy framing) */
+  promptPrefix?: string;
 }
 
 export interface Assertion {
@@ -74,6 +77,8 @@ export interface TrialResult {
   tokens: { input: number; output: number };
   latencyMs: number;
   scores?: AssertionScore[];
+  stopReason?: "end_turn" | "tool_use" | "max_tokens";
+  toolCallCount?: number;
 }
 
 export interface ConditionResult {
@@ -151,11 +156,20 @@ export interface BudgetSummary {
   totalSavingsPercent: number;
 }
 
+export interface ToolUsageStats {
+  conditionId: string;
+  conditionName: string;
+  avgToolCalls: number;
+  selfSufficientRate: number;  // fraction of trials with 0 tool calls
+  trialCount: number;
+}
+
 export interface AnalysisReport {
   conditionStats: ConditionStats[];
   comparisons: ConditionComparison[];
   diagnostics: AssertionDiagnostic[];
   budget: BudgetSummary;
+  toolUsage?: ToolUsageStats[];
 }
 
 export interface IterationDelta {

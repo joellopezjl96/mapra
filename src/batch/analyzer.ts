@@ -14,6 +14,7 @@ import type {
   AssertionDiagnostic,
   BudgetSummary,
   AnalysisReport,
+  ToolUsageStats,
   IterationDelta,
   IterationComparison,
 } from "./types.js";
@@ -402,6 +403,41 @@ function checkNegativeSignal(
   }
 }
 
+// ─── Tool usage stats ────────────────────────────────────
+
+function computeToolUsage(results: QuestionResult[]): ToolUsageStats[] {
+  const condMap = new Map<string, { name: string; toolCalls: number[]; }>();
+
+  for (const qr of results) {
+    for (const cr of qr.conditions) {
+      for (const trial of cr.trials) {
+        if (trial.toolCallCount === undefined) continue;
+        let entry = condMap.get(cr.conditionId);
+        if (!entry) {
+          entry = { name: cr.conditionName, toolCalls: [] };
+          condMap.set(cr.conditionId, entry);
+        }
+        entry.toolCalls.push(trial.toolCallCount);
+      }
+    }
+  }
+
+  const stats: ToolUsageStats[] = [];
+  for (const [id, entry] of condMap) {
+    const total = entry.toolCalls.reduce((a, b) => a + b, 0);
+    const selfSufficient = entry.toolCalls.filter(c => c === 0).length;
+    stats.push({
+      conditionId: id,
+      conditionName: entry.name,
+      avgToolCalls: total / entry.toolCalls.length,
+      selfSufficientRate: selfSufficient / entry.toolCalls.length,
+      trialCount: entry.toolCalls.length,
+    });
+  }
+
+  return stats;
+}
+
 // ─── Public API ──────────────────────────────────────────
 
 export function analyzeResults(batch: BatchResults): AnalysisReport {
@@ -409,8 +445,13 @@ export function analyzeResults(batch: BatchResults): AnalysisReport {
   const comparisons = computeComparisons(batch.results);
   const diagnostics = computeDiagnostics(batch.results);
   const budget = computeBudget(diagnostics, batch.summary.totalCostEstimate, batch.results);
+  const toolUsage = computeToolUsage(batch.results);
 
-  return { conditionStats, comparisons, diagnostics, budget };
+  const report: AnalysisReport = { conditionStats, comparisons, diagnostics, budget };
+  if (toolUsage.length > 0) {
+    report.toolUsage = toolUsage;
+  }
+  return report;
 }
 
 function countUniqueAssertions(results: QuestionResult[]): number {
@@ -510,6 +551,18 @@ export function formatReport(report: AnalysisReport): string {
   lines.push(`    Recoverable from redundant:   ~$${report.budget.recoverableFromRedundant.toFixed(2)}`);
   lines.push(`    Total savings available:       ~${report.budget.totalSavingsPercent}%`);
   lines.push("");
+
+  // Tool usage section — only shown when any trials have toolCallCount
+  if (report.toolUsage && report.toolUsage.length > 0) {
+    lines.push("=== TOOL USAGE ===\n");
+    for (const tu of report.toolUsage) {
+      const selfSuffPct = (tu.selfSufficientRate * 100).toFixed(0);
+      lines.push(
+        `  ${tu.conditionName.padEnd(28)} avg calls: ${tu.avgToolCalls.toFixed(1)}  self-sufficient: ${selfSuffPct}%  (${tu.trialCount} trials)`,
+      );
+    }
+    lines.push("");
+  }
 
   return lines.join("\n");
 }

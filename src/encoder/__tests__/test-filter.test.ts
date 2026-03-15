@@ -118,16 +118,16 @@ describe("test file filtering in encoder", () => {
           modulesAffected: 1,
           affectedModuleNames: ["test"],
         })),
-        // 10 production files
+        // 10 production files in distinct modules (so dedup doesn't collapse them)
         ...Array.from({ length: 10 }, (_, i) => ({
-          nodeId: `src/lib/prod-${i}.ts`,
+          nodeId: `src/mod${i}/prod.ts`,
           directImporters: 10 - i,
           affectedCount: 50 - i * 5,
           weightedImpact: 35.0 - i * 3.5,
           amplificationRatio: 4.0,
           maxDepth: 2,
           modulesAffected: 2,
-          affectedModuleNames: ["src/app", "src/lib"],
+          affectedModuleNames: ["src/app", `src/mod${i}`],
         })),
       ],
     };
@@ -138,7 +138,7 @@ describe("test file filtering in encoder", () => {
         type: "test",
       })),
       ...Array.from({ length: 10 }, (_, i) => ({
-        id: `src/lib/prod-${i}.ts`,
+        id: `src/mod${i}/prod.ts`,
         type: "utility",
       })),
     ]);

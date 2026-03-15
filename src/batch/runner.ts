@@ -196,6 +196,8 @@ export async function runBatch(
             encoding,
             question.question,
             config.maxTokens,
+            condition.enableTools,
+            condition.promptPrefix,
           );
           trial.trial = t + 1;
           cr.trials.push(trial);
@@ -414,27 +416,73 @@ function buildEncoding(
 
 // ─── Trial execution ────────────────────────────────────
 
+const EXPLORATION_TOOLS: Anthropic.Tool[] = [
+  {
+    name: "read_file",
+    description: "Read a file's contents",
+    input_schema: {
+      type: "object" as const,
+      properties: { path: { type: "string" } },
+      required: ["path"],
+    },
+  },
+  {
+    name: "search_files",
+    description: "Search for files by name pattern",
+    input_schema: {
+      type: "object" as const,
+      properties: { pattern: { type: "string" } },
+      required: ["pattern"],
+    },
+  },
+  {
+    name: "grep_content",
+    description: "Search file contents with regex",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        pattern: { type: "string" },
+        path: { type: "string" },
+      },
+      required: ["pattern"],
+    },
+  },
+];
+
 async function runTrial(
   client: Anthropic,
   model: string,
   encoding: string,
   question: string,
   maxTokens: number,
+  enableTools?: boolean,
+  promptPrefix?: string,
 ): Promise<TrialResult> {
-  const prompt = buildPrompt(encoding, question);
+  const prompt = buildPrompt(encoding, question, promptPrefix);
   const start = Date.now();
 
-  const response = await client.messages.create({
+  const params: Anthropic.MessageCreateParams = {
     model,
     max_tokens: maxTokens,
     messages: [{ role: "user", content: prompt }],
-  });
+  };
+
+  if (enableTools) {
+    params.tools = EXPLORATION_TOOLS;
+  }
+
+  const response = await client.messages.create(params);
 
   const latencyMs = Date.now() - start;
-  const text =
-    response.content[0]?.type === "text" ? response.content[0].text : "";
 
-  return {
+  // Extract text from response (may contain both text and tool_use blocks)
+  const textBlocks = response.content.filter(b => b.type === "text");
+  const text = textBlocks.map(b => b.type === "text" ? b.text : "").join("\n");
+
+  // Count tool_use blocks
+  const toolCallCount = response.content.filter(b => b.type === "tool_use").length;
+
+  const result: TrialResult = {
     trial: 0, // Will be set by caller
     response: text,
     tokens: {
@@ -443,13 +491,23 @@ async function runTrial(
     },
     latencyMs,
   };
+
+  if (enableTools) {
+    result.stopReason = (response.stop_reason ?? "end_turn") as NonNullable<TrialResult["stopReason"]>;
+    result.toolCallCount = toolCallCount;
+  }
+
+  return result;
 }
 
-function buildPrompt(encoding: string, question: string): string {
+export function buildPrompt(encoding: string, question: string, promptPrefix?: string): string {
+  const fullQuestion = promptPrefix
+    ? `${promptPrefix}\n\n${question}`
+    : question;
   if (encoding.length === 0) {
-    return question;
+    return fullQuestion;
   }
-  return `Here is an encoding of a codebase:\n\n${encoding}\n\nBased on this encoding, answer the following question:\n\n${question}`;
+  return `Here is an encoding of a codebase:\n\n${encoding}\n\nBased on this encoding, answer the following question:\n\n${fullQuestion}`;
 }
 
 // ─── Checkpointing ──────────────────────────────────────

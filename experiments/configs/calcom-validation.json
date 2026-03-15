@@ -44,8 +44,8 @@
       "taskType": "change-safety",
       "assertions": [
         {
-          "description": "Identifies errorFormatter.ts as high-risk",
-          "check": "Response mentions errorFormatter.ts or error formatter as a high-risk / dangerous file, ideally citing its amplification ratio or cascade depth"
+          "description": "Identifies a high-risk tRPC server file",
+          "check": "Response mentions at least one high-risk tRPC server file (errorFormatter.ts, sessionMiddleware.ts, or Prisma/database extensions) citing blast radius data such as amplification ratio, cascade depth, or affected file count"
         },
         {
           "description": "Identifies sessionMiddleware.ts as high-risk",
@@ -64,7 +64,7 @@
       "assertions": [
         {
           "description": "Ranks errorFormatter.ts as most or second-most dangerous",
-          "check": "Response ranks errorFormatter.ts as #1 or #2 most dangerous, citing its cascade/amplification (amp 68, cascades to 68 files)"
+          "check": "Response ranks errorFormatter.ts as #1 or #2 most dangerous, citing its amplification ratio, cascade depth, or affected file count"
         },
         {
           "description": "Ranks playwright/fixtures.ts as least dangerous in production",
@@ -87,18 +87,18 @@
         },
         {
           "description": "Cites amplification or affected count",
-          "check": "Response mentions amplification ratio (~30) or that the change affects approximately 30 files, or references cascade depth of 4"
+          "check": "Response mentions amplification ratio or that the change affects many files transitively, citing specific numbers from the encoding"
         }
       ]
     },
     {
       "id": "impact-types-breaking",
-      "question": "packages/trpc/server/types.ts is the most imported file in the codebase. If it needs breaking changes to its exported types, what is the scope of impact? How would you approach this safely?",
+      "question": "packages/trpc/server/types.ts is widely imported across the tRPC server layer. If it needs breaking changes to its exported types, what is the scope of impact? How would you approach this safely?",
       "taskType": "impact",
       "assertions": [
         {
           "description": "Identifies scale of impact (100+ importers)",
-          "check": "Response identifies that types.ts is imported by a very large number of files (100+, ideally citing ~166 or ~177 importers)"
+          "check": "Response identifies that types.ts is imported by many files (dozens or more), ideally citing a specific count from the encoding data"
         },
         {
           "description": "Suggests incremental migration strategy",
@@ -147,7 +147,7 @@
       "assertions": [
         {
           "description": "Identifies downstream blast radius",
-          "check": "Response warns about the large downstream impact / blast radius of sessionMiddleware.ts, mentioning that it affects many files (55+) or has high amplification"
+          "check": "Response warns about the large downstream impact / blast radius of sessionMiddleware.ts, mentioning that it affects many files or has high amplification"
         },
         {
           "description": "Mentions specific downstream consumers",
