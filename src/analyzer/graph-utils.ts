@@ -129,3 +129,47 @@ export function countDistinctModules(nodeIds: Iterable<string>): number {
   }
   return modules.size;
 }
+
+/**
+ * BFS with parent tracking — like bfs() but also records which node
+ * discovered each visited node. Used for cascade path reconstruction.
+ */
+export function bfsWithParents(
+  startId: string,
+  adjacency: Map<string, Set<string>>,
+): { depths: Map<string, number>; parents: Map<string, string> } {
+  const visited = new Set<string>([startId]);
+  const depths = new Map<string, number>();
+  const parents = new Map<string, string>();
+  const queue: Array<{ id: string; depth: number }> = [];
+
+  const neighbors = adjacency.get(startId);
+  if (neighbors) {
+    for (const n of neighbors) {
+      if (!visited.has(n)) {
+        visited.add(n);
+        depths.set(n, 1);
+        parents.set(n, startId);
+        queue.push({ id: n, depth: 1 });
+      }
+    }
+  }
+
+  let head = 0;
+  while (head < queue.length) {
+    const { id, depth } = queue[head++]!;
+    const next = adjacency.get(id);
+    if (!next) continue;
+
+    for (const n of next) {
+      if (!visited.has(n)) {
+        visited.add(n);
+        depths.set(n, depth + 1);
+        parents.set(n, id);
+        queue.push({ id: n, depth: depth + 1 });
+      }
+    }
+  }
+
+  return { depths, parents };
+}
