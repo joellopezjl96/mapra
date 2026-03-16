@@ -8,12 +8,13 @@
 export function resolveFile(nodeIds: string[], input: string): string {
   const normalized = input.replace(/\\/g, "/").replace(/^\//, "");
 
-  // Exact match
-  if (nodeIds.includes(normalized)) return normalized;
+  // Exact match (O(1) via Set)
+  const idSet = new Set(nodeIds);
+  if (idSet.has(normalized)) return normalized;
 
   // Suffix match
   const suffix = "/" + normalized;
-  const matches = nodeIds.filter(id => id === normalized || id.endsWith(suffix));
+  const matches = nodeIds.filter(id => id.endsWith(suffix));
 
   if (matches.length === 1) return matches[0]!;
 

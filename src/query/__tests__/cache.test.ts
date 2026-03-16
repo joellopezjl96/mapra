@@ -4,7 +4,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import { execSync } from "child_process";
-import { writeCache, loadCache, checkStaleness, type StrandCache } from "../cache.js";
+import { writeCache, loadCache, checkStaleness, ensureCacheInGitignore, type StrandCache } from "../cache.js";
 import { createTestGraph, createTestAnalysis, createTestCache } from "./fixture.js";
 
 describe("writeCache + loadCache roundtrip", () => {
@@ -116,5 +116,44 @@ describe("checkStaleness", () => {
     const cache = createTestCache({ gitHead: "0000000000000000000000000000000000000000" });
     const result = checkStaleness(cache);
     expect(result).toContain("cache may be stale");
+  });
+});
+
+describe("ensureCacheInGitignore", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "strand-gitignore-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("creates .gitignore if it does not exist", () => {
+    ensureCacheInGitignore(tmpDir);
+    const content = fs.readFileSync(path.join(tmpDir, ".gitignore"), "utf-8");
+    expect(content).toBe(".strand-cache.json\n");
+  });
+
+  it("appends entry to existing .gitignore", () => {
+    fs.writeFileSync(path.join(tmpDir, ".gitignore"), "node_modules\n");
+    ensureCacheInGitignore(tmpDir);
+    const content = fs.readFileSync(path.join(tmpDir, ".gitignore"), "utf-8");
+    expect(content).toBe("node_modules\n.strand-cache.json\n");
+  });
+
+  it("adds newline separator when existing file lacks trailing newline", () => {
+    fs.writeFileSync(path.join(tmpDir, ".gitignore"), "node_modules");
+    ensureCacheInGitignore(tmpDir);
+    const content = fs.readFileSync(path.join(tmpDir, ".gitignore"), "utf-8");
+    expect(content).toBe("node_modules\n.strand-cache.json\n");
+  });
+
+  it("skips if entry is already present", () => {
+    fs.writeFileSync(path.join(tmpDir, ".gitignore"), "node_modules\n.strand-cache.json\n");
+    ensureCacheInGitignore(tmpDir);
+    const content = fs.readFileSync(path.join(tmpDir, ".gitignore"), "utf-8");
+    expect(content).toBe("node_modules\n.strand-cache.json\n");
   });
 });

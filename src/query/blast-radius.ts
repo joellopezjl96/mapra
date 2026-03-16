@@ -15,23 +15,38 @@ export interface BlastRadiusResult {
 }
 
 export function queryBlastRadius(fileId: string, cache: StrandCache): BlastRadiusResult {
-  const testNodeIds = new Set(
-    cache.graph.nodes.filter(n => n.type === "test").map(n => n.id),
-  );
-  const reverseAdj = buildReverseAdjacency(cache.graph.edges, true, testNodeIds);
-  const { depths, parents } = bfsWithParents(fileId, reverseAdj);
-
-  // Use pre-computed risk data for consistent numbers, BFS for cascade path
+  // Use pre-computed risk data when available; only run BFS for cascade path
   const precomputed = cache.analysis.risk.find(r => r.nodeId === fileId);
 
-  const directImporters = precomputed?.directImporters ?? (reverseAdj.get(fileId)?.size ?? 0);
-  const affectedCount = precomputed?.affectedCount ?? depths.size;
+  // Lazy BFS — only run when we need cascade path or fallback data
+  let _bfsResult: { depths: Map<string, number>; parents: Map<string, string> } | undefined;
+  let _reverseAdj: Map<string, Set<string>> | undefined;
+
+  function getBfs() {
+    if (!_bfsResult) {
+      const testNodeIds = new Set(
+        cache.graph.nodes.filter(n => n.type === "test").map(n => n.id),
+      );
+      _reverseAdj = buildReverseAdjacency(cache.graph.edges, true, testNodeIds);
+      _bfsResult = bfsWithParents(fileId, _reverseAdj);
+    }
+    return _bfsResult;
+  }
+
+  const directImporters = precomputed?.directImporters ?? (() => {
+    getBfs();
+    return _reverseAdj!.get(fileId)?.size ?? 0;
+  })();
+  const affectedCount = precomputed?.affectedCount ?? getBfs().depths.size;
   const amplificationRatio = precomputed?.amplificationRatio ??
     (directImporters > 0 ? Math.round((affectedCount / directImporters) * 10) / 10 : 0);
-  const cascadeDepth = precomputed?.maxDepth ?? (depths.size > 0 ? Math.max(...depths.values()) : 0);
+  const cascadeDepth = precomputed?.maxDepth ?? (getBfs().depths.size > 0 ? Math.max(...getBfs().depths.values()) : 0);
   const affectedModules = precomputed?.affectedModuleNames ??
-    [...new Set([...depths.keys()].map(getModuleId))].sort();
+    [...new Set([...getBfs().depths.keys()].map(getModuleId))].sort();
   const modulesAffected = precomputed?.modulesAffected ?? affectedModules.length;
+
+  // Cascade path always needs BFS
+  const { depths, parents } = getBfs();
 
   return {
     file: fileId,
