@@ -12,6 +12,7 @@
  *   strnd validate-plan <plan.md> [--since YYYY-MM-DD] [--checkpoints]  Cross-reference plan against .strand
  *   strnd batch <config.json> [--resume]  Run batch experiment from config
  *   strnd analyze <results.json> [--advise] [--judge-check]  Analyze experiment results
+ *   strnd query <type> <file> [--json]  Query structural data (blast_radius, risk_profile, test_map)
  */
 
 import * as fs from "fs";
@@ -113,6 +114,15 @@ switch (command) {
     console.log("Removed strnd git hooks");
     break;
   }
+  case "query": {
+    try {
+      const { runQueryCommand } = await import("../query/index.js");
+      await runQueryCommand(args);
+    } catch (err) {
+      handleError("query", err);
+    }
+    break;
+  }
   default:
     console.error(`Unknown command: ${command}`);
     printHelp();
@@ -146,6 +156,9 @@ Commands:
                   Analyze experiment results: stats, diagnostics, recommendations
   analyze <old.json> <new.json>
                   Compare two experiment iterations
+  query <type> <file> [--json]
+                  Query structural data for a specific file
+                  Types: blast_radius, risk_profile, test_map
 
 Flags:
   --silent        Suppress output (used by git hooks)
@@ -310,6 +323,24 @@ async function runGenerate(targetArg?: string, softFail = false, silent = false)
       fs.writeFileSync(outputPath, encoded, "utf-8");
     } finally {
       try { fs.unlinkSync(tmpPath); } catch { /* .tmp already renamed or gone */ }
+    }
+
+    // Write query cache alongside .strand — failure is non-fatal
+    try {
+      const { writeCache, ensureCacheInGitignore } = await import("../query/cache.js");
+      const { execSync } = await import("child_process");
+      let fullHash: string | undefined;
+      try {
+        fullHash = execSync("git rev-parse HEAD", {
+          cwd: targetPath, encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"],
+        }).trim() || undefined;
+      } catch { /* not a git repo */ }
+      writeCache(targetPath, graph, analysis, fullHash);
+      ensureCacheInGitignore(targetPath);
+    } catch (cacheErr) {
+      if (!silent) {
+        console.warn(`\u26A0 Failed to write .strand-cache.json: ${cacheErr instanceof Error ? cacheErr.message : String(cacheErr)}`);
+      }
     }
 
     if (!silent) {
