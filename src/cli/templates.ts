@@ -26,6 +26,9 @@ most recently read version. Compare the \`generated\` timestamp in the
 header line to identify which is newest.
 
 @.strand
+
+For detailed structural queries, use \`strnd query <type> <file>\`.
+Available types: blast_radius, risk_profile, test_map. Use --json for structured output.
 `;
 
 /** Message printed to stdout after strnd update to signal context supersession. */
