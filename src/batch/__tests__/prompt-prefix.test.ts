@@ -3,7 +3,7 @@ import { buildPrompt } from "../runner.js";
 
 describe("buildPrompt", () => {
   const question = "What does this codebase do?";
-  const encoding = "STRAND v3 | test | Typescript | 10 files";
+  const encoding = "MAPRA v3 | test | Typescript | 10 files";
   const prefix = "You are a senior engineer.";
 
   it("returns just the question when no prefix and no encoding", () => {

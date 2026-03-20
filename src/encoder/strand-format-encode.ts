@@ -1,5 +1,5 @@
 /**
- * .strand Format Encoder — ASCII art + structured data
+ * .mapra Format Encoder — ASCII art + structured data
  *
  * A custom format using Unicode block chars for visual heatmaps
  * and box-drawing chars for dependency flows. No coordinates —
@@ -18,7 +18,7 @@ export interface EncodeOptions {
 }
 
 /**
- * Generate a .strand format encoding of the codebase.
+ * Generate a .mapra format encoding of the codebase.
  * Does NOT use the layout engine — no coordinates needed.
  */
 export function encodeToStrandFormat(graph: StrandGraph, analysis?: GraphAnalysis, options?: EncodeOptions): string {
@@ -27,7 +27,7 @@ export function encodeToStrandFormat(graph: StrandGraph, analysis?: GraphAnalysi
   // Header
   const generated = new Date().toISOString().slice(0, 19);
   const gitSuffix = options?.gitHash ? ` | git:${options.gitHash}` : "";
-  out += `STRAND v3 | ${graph.projectName} | ${capitalize(graph.framework)} | ${graph.totalFiles} files | ${graph.totalLines.toLocaleString()} lines | generated ${generated}${gitSuffix}\n`;
+  out += `MAPRA v3 | ${graph.projectName} | ${capitalize(graph.framework)} | ${graph.totalFiles} files | ${graph.totalLines.toLocaleString()} lines | generated ${generated}${gitSuffix}\n`;
   out += `LEGEND: ×N=imported by N files | ═/·=coupling strong/weak | ×A→B=A direct, B total affected | dN=cascade depth | [AMP]=amplification≥2x | TN=N test files | NL=lines of code | Nx=co-change count | linked/no-import=import connection\n`;
   out += `USAGE: planning→RISK,CONVENTIONS,INFRASTRUCTURE | debugging→FLOWS,CHURN,CO-CHANGE | refactoring→RISK,CHURN,CO-CHANGE | review→CONVENTIONS,RISK,CHURN | impact-analysis→RISK,CO-CHANGE\n\n`;
 
@@ -242,7 +242,7 @@ function renderRisk(graph: StrandGraph, analysis: GraphAnalysis): string {
 function renderChurn(graph: StrandGraph, analysis: GraphAnalysis): string {
   if (!analysis.churn || analysis.churn.size === 0) return "";
 
-  // Only show files that exist in the scanner graph (filters out .md, lock files, .strand, etc.)
+  // Only show files that exist in the scanner graph (filters out .md, lock files, .mapra, etc.)
   const graphNodeIds = new Set(graph.nodes.map(n => n.id));
 
   // Get files with >= 3 commits (high churn)

@@ -1,5 +1,5 @@
 // src/query/risk-profile.ts
-import type { StrandCache } from "./cache.js";
+import type { MapraCache } from "./cache.js";
 import { queryTestMap, type TestMapResult } from "./test-map.js";
 
 export interface RiskProfileResult {
@@ -28,7 +28,7 @@ export interface RiskProfileResult {
   conventionViolations: string[];
 }
 
-export function queryRiskProfile(fileId: string, cache: StrandCache): RiskProfileResult {
+export function queryRiskProfile(fileId: string, cache: MapraCache): RiskProfileResult {
   // Blast radius
   const blastResult = cache.analysis.risk.find(r => r.nodeId === fileId);
   const risk = blastResult

@@ -75,7 +75,7 @@ Modify: \`src/app.ts\`
 Create: \`src/auth-core.ts\`
 
 ### Step 2: Refresh map [CHECKPOINT]
-Run \`strnd update\` then read the new \`.strand\`.
+Run \`mapra update\` then read the new \`.mapra\`.
 
 ### Step 3: Wire importers
 Modify: \`src/app.ts\`

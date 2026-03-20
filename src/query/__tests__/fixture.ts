@@ -5,7 +5,7 @@ import type { BlastResult } from "../../analyzer/blast-radius.js";
 import type { ChurnResult } from "../../analyzer/churn.js";
 import type { Convention } from "../../analyzer/conventions.js";
 import type { CoChangePair } from "../../analyzer/co-change.js";
-import type { StrandCache } from "../cache.js";
+import type { MapraCache } from "../cache.js";
 
 export function createTestGraph(): StrandGraph {
   return {
@@ -105,7 +105,7 @@ export function createTestAnalysis(): GraphAnalysis {
   };
 }
 
-export function createTestCache(overrides?: Partial<StrandCache>): StrandCache {
+export function createTestCache(overrides?: Partial<MapraCache>): MapraCache {
   return {
     version: 1,
     generated: "2026-03-15T12:00:00.000Z",

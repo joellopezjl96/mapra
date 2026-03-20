@@ -25,5 +25,5 @@ export function resolveFile(nodeIds: string[], input: string): string {
     );
   }
 
-  throw new Error(`'${input}' not found in cache. Check the path or run 'strnd generate'.`);
+  throw new Error(`'${input}' not found in cache. Check the path or run 'mapra generate'.`);
 }

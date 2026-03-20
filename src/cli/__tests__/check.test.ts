@@ -5,7 +5,7 @@ import { getGitHash } from "../../analyzer/git-hash.js";
 import * as path from "path";
 
 /**
- * Tests for the `strnd check` command logic.
+ * Tests for the `mapra check` command logic.
  * These test the underlying utilities (parseStrandHeader + getGitHash) together,
  * since the check command is a thin orchestration layer on top.
  */
@@ -15,13 +15,13 @@ describe("check command logic", () => {
     const currentHash = getGitHash(rootDir);
     expect(currentHash).not.toBeNull();
 
-    // Simulate a .strand header generated at the current commit
-    const header = `STRAND v3 | test | Typescript | 10 files | 500 lines | generated 2026-03-08T00:00:00 | git:${currentHash}\n`;
+    // Simulate a .mapra header generated at the current commit
+    const header = `MAPRA v3 | test | Typescript | 10 files | 500 lines | generated 2026-03-08T00:00:00 | git:${currentHash}\n`;
     const parsed = parseStrandHeader(header);
     expect(parsed).not.toBeNull();
     expect(parsed!.gitHash).toBe(currentHash);
 
-    // When hashes match, .strand is current
+    // When hashes match, .mapra is current
     const isCurrent = parsed!.gitHash === currentHash;
     expect(isCurrent).toBe(true);
   });
@@ -31,19 +31,19 @@ describe("check command logic", () => {
     const currentHash = getGitHash(rootDir);
     expect(currentHash).not.toBeNull();
 
-    // Simulate a .strand header generated at a different commit
-    const header = `STRAND v3 | test | Typescript | 10 files | 500 lines | generated 2026-03-07T00:00:00 | git:0000000\n`;
+    // Simulate a .mapra header generated at a different commit
+    const header = `MAPRA v3 | test | Typescript | 10 files | 500 lines | generated 2026-03-07T00:00:00 | git:0000000\n`;
     const parsed = parseStrandHeader(header);
     expect(parsed).not.toBeNull();
     expect(parsed!.gitHash).toBe("0000000");
 
-    // When hashes differ, .strand is stale
+    // When hashes differ, .mapra is stale
     const isCurrent = parsed!.gitHash === currentHash;
     expect(isCurrent).toBe(false);
   });
 
   it("handles legacy header without git hash", () => {
-    const header = `STRAND v3 | test | Typescript | 10 files | 500 lines | generated 2026-03-07T00:00:00\n`;
+    const header = `MAPRA v3 | test | Typescript | 10 files | 500 lines | generated 2026-03-07T00:00:00\n`;
     const parsed = parseStrandHeader(header);
     expect(parsed).not.toBeNull();
     expect(parsed!.gitHash).toBeNull();

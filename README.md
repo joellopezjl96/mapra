@@ -1,14 +1,14 @@
-# strnd
+# mapra
 
 **Stop exploring. Start building.**
 
-Strnd encodes your codebase's structure, risk, and complexity into a single version-controlled file — so you and your AI tools understand the whole picture before touching any code.
+Mapra encodes your codebase's structure, risk, and complexity into a single version-controlled file — so you and your AI tools understand the whole picture before touching any code.
 
 ## What does it do?
 
-AI coding agents spend significant time exploring codebases — listing directories, reading files to understand structure, figuring out what depends on what. In testing, a typical structural question required **45 tool calls** without strnd. With strnd: **zero**.
+AI coding agents spend significant time exploring codebases — listing directories, reading files to understand structure, figuring out what depends on what. In testing, a typical structural question required **45 tool calls** without mapra. With mapra: **zero**.
 
-Strnd scans your codebase and produces a `.strand` file that captures:
+Mapra scans your codebase and produces a `.mapra` file that captures:
 
 - **Risk** — blast radius, cascade depth, and hidden amplifiers (files where a small change breaks many things)
 - **Churn** — what's been changing and how fast
@@ -21,10 +21,10 @@ One file read gives your AI agent instant structural awareness.
 ## Quick Start
 
 ```bash
-npx strnd
+npx mapra
 ```
 
-That's it. This scans your codebase, generates `.strand`, wires it into your `CLAUDE.md`, and installs git hooks to keep it fresh.
+That's it. This scans your codebase, generates `.mapra`, wires it into your `CLAUDE.md`, and installs git hooks to keep it fresh.
 
 ### Requirements
 
@@ -33,10 +33,10 @@ That's it. This scans your codebase, generates `.strand`, wires it into your `CL
 
 ## What you get
 
-Here's a real `.strand` file from a Next.js app (300 files, 53K lines):
+Here's a real `.mapra` file from a Next.js app (300 files, 53K lines):
 
 ```
-STRAND v3 | myapp | Nextjs | 300 files | 53,081 lines | generated 2026-03-06
+MAPRA v3 | myapp | Nextjs | 300 files | 53,081 lines | generated 2026-03-06
 LEGEND: ×N=imported by N files | ×A→B=A direct, B total affected | dN=cascade depth | [AMP]=amplification>=2x
 
 ─── RISK (blast radius — modifying these cascades broadly) ─
@@ -55,11 +55,11 @@ LEGEND: ×N=imported by N files | ×A→B=A direct, B total affected | dN=cascad
 0.75  src/cli/index.ts          833L  5imp
 ```
 
-The RISK section is strnd's unique value — it shows **hidden amplifiers**: files with few direct importers but high cascade impact. `constants.ts` above has only 3 direct importers but affects 21 files (amp 7.0). No other tool surfaces this.
+The RISK section is mapra's unique value — it shows **hidden amplifiers**: files with few direct importers but high cascade impact. `constants.ts` above has only 3 direct importers but affects 21 files (amp 7.0). No other tool surfaces this.
 
 ### Reading the output
 
-The `.strand` header includes a LEGEND that decodes the compact notation:
+The `.mapra` header includes a LEGEND that decodes the compact notation:
 
 | Symbol | Meaning | Example |
 |--------|---------|---------|
@@ -75,39 +75,39 @@ The `.strand` header includes a LEGEND that decodes the compact notation:
 ## Commands
 
 ```
-strnd                        First-time setup (generate + wire + hooks)
-strnd update                 Regenerate .strand after code changes
-strnd status                 Check .strand freshness, hook state, wiring
+mapra                        First-time setup (generate + wire + hooks)
+mapra update                 Regenerate .mapra after code changes
+mapra status                 Check .mapra freshness, hook state, wiring
 ```
 
 ### Setup details
 
-`strnd setup` does four things:
+`mapra setup` does four things:
 
-1. Scans your codebase and writes `.strand`
-2. Adds an `@.strand` reference to your `CLAUDE.md`
+1. Scans your codebase and writes `.mapra`
+2. Adds an `@.mapra` reference to your `CLAUDE.md`
 3. Installs git hooks (post-commit, post-merge, post-checkout) for auto-update
 4. Adds a `prepare` script to `package.json` so teammates get hooks on `npm install`
 
 ### Other commands
 
 ```
-strnd generate [path]        Scan and write .strand (without wiring CLAUDE.md)
-strnd init [path]            Wire @.strand into CLAUDE.md (without regenerating)
-strnd install-hooks [path]   Install git hooks manually
-strnd uninstall-hooks [path] Remove strnd git hooks
-strnd validate-plan <file>   Cross-reference a plan's file paths against .strand
+mapra generate [path]        Scan and write .mapra (without wiring CLAUDE.md)
+mapra init [path]            Wire @.mapra into CLAUDE.md (without regenerating)
+mapra install-hooks [path]   Install git hooks manually
+mapra uninstall-hooks [path] Remove mapra git hooks
+mapra validate-plan <file>   Cross-reference a plan's file paths against .mapra
 ```
 
 ## Auto-Update
 
-After setup, `.strand` stays fresh automatically:
+After setup, `.mapra` stays fresh automatically:
 
-- **Git hooks** regenerate `.strand` silently after every commit, merge, and branch switch
+- **Git hooks** regenerate `.mapra` silently after every commit, merge, and branch switch
 - **Teammates** get hooks automatically via `npm install` (prepare script)
-- **Safe** — regeneration runs in the background; if it fails, your existing `.strand` stays intact
+- **Safe** — regeneration runs in the background; if it fails, your existing `.mapra` stays intact
 
-Run `strnd status` to verify everything is working. To remove: `strnd uninstall-hooks`.
+Run `mapra status` to verify everything is working. To remove: `mapra uninstall-hooks`.
 
 ## Troubleshooting
 
@@ -117,23 +117,23 @@ If you cloned with `--depth`, the CHURN section will be empty or incomplete. Fix
 
 ```bash
 git fetch --unshallow
-strnd update
+mapra update
 ```
 
-### `.strand` in `.gitignore`
+### `.mapra` in `.gitignore`
 
-`.strand` should be committed — it's how your team shares structural awareness. If `strnd status` warns about `.gitignore`, remove the `.strand` entry.
+`.mapra` should be committed — it's how your team shares structural awareness. If `mapra status` warns about `.gitignore`, remove the `.mapra` entry.
 
-### Stale `.strand`
+### Stale `.mapra`
 
-If `strnd status` shows "may be stale", run `strnd update`. With auto-update hooks installed, this shouldn't happen.
+If `mapra status` shows "may be stale", run `mapra update`. With auto-update hooks installed, this shouldn't happen.
 
 ## How It Works
 
 1. **Scan** — parses source files, extracting imports, exports, and module boundaries
 2. **Analyze** — computes blast radius, churn velocity, dead code, and convention patterns
-3. **Encode** — compresses everything into a compact `.strand` file (~1-2K tokens for most projects)
-4. **Wire** — adds an `@.strand` reference to your `CLAUDE.md` so AI tools load the map automatically
+3. **Encode** — compresses everything into a compact `.mapra` file (~1-2K tokens for most projects)
+4. **Wire** — adds an `@.mapra` reference to your `CLAUDE.md` so AI tools load the map automatically
 
 ## Language Support
 

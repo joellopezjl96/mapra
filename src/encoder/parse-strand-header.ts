@@ -1,9 +1,9 @@
 /**
- * .strand Header Parser — extracts metadata from the STRAND header line.
+ * .mapra Header Parser — extracts metadata from the MAPRA header line.
  *
  * Parses headers like:
- *   STRAND v3 | project | Typescript | 76 files | 12,629 lines | generated 2026-03-07T05:21:49 | git:f9e429a
- *   STRAND v3 | project | Typescript | 76 files | 12,629 lines | generated 2026-03-07T05:21:49
+ *   MAPRA v3 | project | Typescript | 76 files | 12,629 lines | generated 2026-03-07T05:21:49 | git:f9e429a
+ *   MAPRA v3 | project | Typescript | 76 files | 12,629 lines | generated 2026-03-07T05:21:49
  */
 
 export interface StrandHeaderInfo {
@@ -24,20 +24,20 @@ export interface StrandHeaderInfo {
 }
 
 /**
- * Parse a .strand file's header line and extract structured metadata.
- * Returns null if the content doesn't contain a valid STRAND header.
+ * Parse a .mapra file's header line and extract structured metadata.
+ * Returns null if the content doesn't contain a valid MAPRA header.
  */
 export function parseStrandHeader(content: string): StrandHeaderInfo | null {
   // Take only the first line
   const firstLine = content.split("\n")[0];
-  if (!firstLine || !firstLine.startsWith("STRAND ")) return null;
+  if (!firstLine || !firstLine.startsWith("MAPRA ")) return null;
 
   // Split on " | " to get segments
   const segments = firstLine.split(" | ");
   if (segments.length < 6) return null;
 
-  // Segment 0: "STRAND v3"
-  const versionMatch = segments[0]?.match(/^STRAND\s+(v\d+)$/);
+  // Segment 0: "MAPRA v3"
+  const versionMatch = segments[0]?.match(/^MAPRA\s+(v\d+)$/);
   if (!versionMatch) return null;
   const version = versionMatch[1]!;
 

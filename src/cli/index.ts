@@ -1,24 +1,24 @@
 #!/usr/bin/env node
 /**
- * strnd CLI
+ * mapra CLI
  *
  * Commands:
- *   strnd setup [path]    Generate .strand and wire CLAUDE.md (first-time setup)
- *   strnd generate [path] Scan codebase and write .strand file
- *   strnd update [path]   Regenerate .strand in place (alias for generate in cwd)
- *   strnd init [path]     Wire .strand into project's CLAUDE.md
- *   strnd status [path]   Show current strnd setup state
- *   strnd check [path]    Check if .strand is current or stale (git hash comparison)
- *   strnd validate-plan <plan.md> [--since YYYY-MM-DD] [--checkpoints]  Cross-reference plan against .strand
- *   strnd batch <config.json> [--resume]  Run batch experiment from config
- *   strnd analyze <results.json> [--advise] [--judge-check]  Analyze experiment results
- *   strnd query <type> <file> [--json]  Query structural data (blast_radius, risk_profile, test_map)
+ *   mapra setup [path]    Generate .mapra and wire CLAUDE.md (first-time setup)
+ *   mapra generate [path] Scan codebase and write .mapra file
+ *   mapra update [path]   Regenerate .mapra in place (alias for generate in cwd)
+ *   mapra init [path]     Wire .mapra into project's CLAUDE.md
+ *   mapra status [path]   Show current mapra setup state
+ *   mapra check [path]    Check if .mapra is current or stale (git hash comparison)
+ *   mapra validate-plan <plan.md> [--since YYYY-MM-DD] [--checkpoints]  Cross-reference plan against .mapra
+ *   mapra batch <config.json> [--resume]  Run batch experiment from config
+ *   mapra analyze <results.json> [--advise] [--judge-check]  Analyze experiment results
+ *   mapra query <type> <file> [--json]  Query structural data (blast_radius, risk_profile, test_map)
  */
 
 import * as fs from "fs";
 import * as path from "path";
-import { applyStrandSection, SUPERSESSION_MESSAGE, type StrandAction } from "./templates.js";
-import { installAllHooks, uninstallAllHooks, getHooksDir, STRND_HOOK_START } from "./hooks.js";
+import { applyMapraSection, SUPERSESSION_MESSAGE, type MapraAction } from "./templates.js";
+import { installAllHooks, uninstallAllHooks, getHooksDir, MAPRA_HOOK_START } from "./hooks.js";
 import { generateHookShim } from "./shim.js";
 
 const [, , command, ...args] = process.argv;
@@ -32,7 +32,7 @@ if (!command) {
   console.log(
     "No command given — running setup (generate + init) in current directory.",
   );
-  console.log("Use 'strnd --help' to see all commands.\n");
+  console.log("Use 'mapra --help' to see all commands.\n");
   await runSetup(undefined);
   process.exit(0);
 }
@@ -54,10 +54,10 @@ switch (command) {
       await runGenerate(targetArg ?? process.cwd(), true, silent);
     } catch (err) {
       console.error(
-        `strnd update failed: ${err instanceof Error ? err.message : String(err)}`,
+        `mapra update failed: ${err instanceof Error ? err.message : String(err)}`,
       );
       console.error(
-        "Continuing with stale .strand. Complete your refactor and retry.",
+        "Continuing with stale .mapra. Complete your refactor and retry.",
       );
     }
     break;
@@ -111,7 +111,7 @@ switch (command) {
   case "uninstall-hooks": {
     const targetPath = resolveTarget(args[0]);
     uninstallAllHooks(targetPath);
-    console.log("Removed strnd git hooks");
+    console.log("Removed mapra git hooks");
     break;
   }
   case "query": {
@@ -131,24 +131,24 @@ switch (command) {
 
 function printHelp() {
   console.log(`
-strnd — stop exploring. start building.
+mapra — stop exploring. start building.
 
 Quick start:
-  strnd                        Run setup in current directory (first-time setup)
-  strnd update                 Regenerate .strand after codebase changes
+  mapra                        Run setup in current directory (first-time setup)
+  mapra update                 Regenerate .mapra after codebase changes
 
 Commands:
-  setup [path]    Generate .strand, wire CLAUDE.md, install auto-update hooks
-  generate [path] Scan codebase and write .strand to project root
-  update [path]   Regenerate .strand in place (alias for generate in cwd)
-  init [path]     Wire @.strand reference into project's CLAUDE.md
-  status [path]   Show whether .strand is present, wired, and fresh
-  check [path]    Check if .strand is current or stale (compares git hash)
+  setup [path]    Generate .mapra, wire CLAUDE.md, install auto-update hooks
+  generate [path] Scan codebase and write .mapra to project root
+  update [path]   Regenerate .mapra in place (alias for generate in cwd)
+  init [path]     Wire @.mapra reference into project's CLAUDE.md
+  status [path]   Show whether .mapra is present, wired, and fresh
+  check [path]    Check if .mapra is current or stale (compares git hash)
                   --fail-if-stale: exit code 1 if stale (for CI)
   install-hooks [path]    Install git hooks for auto-update
-  uninstall-hooks [path]  Remove strnd git hooks
+  uninstall-hooks [path]  Remove mapra git hooks
   validate-plan <plan.md> [--since YYYY-MM-DD] [--checkpoints]
-                  Cross-reference plan file paths against .strand data
+                  Cross-reference plan file paths against .mapra data
   batch <config.json> [--resume] [--smart]
                   Run batch experiment comparing encoding conditions
                   --smart: score inline and stop early when verdicts are unanimous
@@ -166,45 +166,45 @@ Flags:
   Default path: current working directory
 
 Auto-update:
-  After setup, .strand regenerates automatically on commit, merge, and
+  After setup, .mapra regenerates automatically on commit, merge, and
   branch switch via git hooks. Teammates get hooks via npm install
-  (prepare script). Run 'strnd status' to check hook state.
+  (prepare script). Run 'mapra status' to check hook state.
 
 Examples:
-  strnd setup                      # first-time setup in cwd
-  strnd setup /path/to/project     # first-time setup for a specific project
-  strnd update                     # refresh after code changes
-  strnd status                     # check current state
-  strnd batch experiments/configs/strand-v3-effectiveness.json
+  mapra setup                      # first-time setup in cwd
+  mapra setup /path/to/project     # first-time setup for a specific project
+  mapra update                     # refresh after code changes
+  mapra status                     # check current state
+  mapra batch experiments/configs/strand-v3-effectiveness.json
 `);
 }
 
 async function runSetup(targetArg?: string) {
-  console.log("Setting up strnd...\n");
+  console.log("Setting up mapra...\n");
   const targetPath = resolveTarget(targetArg ?? process.cwd());
 
-  // Step 1: Generate .strand
+  // Step 1: Generate .mapra
   await runGenerate(targetPath);
   console.log();
 
   // Step 2: Wire CLAUDE.md
   await runInit(targetPath);
 
-  // Step 3: Write .strnd/hook.mjs
-  const strndDir = path.join(targetPath, ".strnd");
-  fs.mkdirSync(strndDir, { recursive: true });
+  // Step 3: Write .mapra/hook.mjs
+  const mapraDir = path.join(targetPath, ".mapra");
+  fs.mkdirSync(mapraDir, { recursive: true });
 
   const version = getVersion();
   const shimContent = generateHookShim(version);
   fs.writeFileSync(
-    path.join(strndDir, "hook.mjs"),
+    path.join(mapraDir, "hook.mjs"),
     shimContent.replace(/\r\n/g, "\n"),
   );
-  console.log("Wrote .strnd/hook.mjs (auto-update shim)");
+  console.log("Wrote .mapra/hook.mjs (auto-update shim)");
 
-  // Step 4: Write .strnd/.gitignore (ignore lockfile)
+  // Step 4: Write .mapra/.gitignore (ignore lockfile)
   fs.writeFileSync(
-    path.join(strndDir, ".gitignore"),
+    path.join(mapraDir, ".gitignore"),
     ".lock\n",
   );
 
@@ -220,7 +220,7 @@ async function runSetup(targetArg?: string) {
 
   // Step 6: Add .gitattributes entry for linguist-generated
   const gitattrsPath = path.join(targetPath, ".gitattributes");
-  const gitattrsEntry = ".strnd/hook.mjs linguist-generated=true";
+  const gitattrsEntry = ".mapra/hook.mjs linguist-generated=true";
   if (fs.existsSync(gitattrsPath)) {
     const existing = fs.readFileSync(gitattrsPath, "utf-8");
     if (!existing.includes(gitattrsEntry)) {
@@ -240,28 +240,28 @@ async function runSetup(targetArg?: string) {
 
       // Add prepare script
       if (!pkgJson.scripts) pkgJson.scripts = {};
-      if (!pkgJson.scripts.prepare || !pkgJson.scripts.prepare.includes("strnd")) {
+      if (!pkgJson.scripts.prepare || !pkgJson.scripts.prepare.includes("mapra")) {
         if (pkgJson.scripts.prepare) {
-          pkgJson.scripts.prepare += " && strnd install-hooks";
+          pkgJson.scripts.prepare += " && mapra install-hooks";
         } else {
-          pkgJson.scripts.prepare = "strnd install-hooks";
+          pkgJson.scripts.prepare = "mapra install-hooks";
         }
         modified = true;
       }
 
       // Add devDependency
       if (!pkgJson.devDependencies) pkgJson.devDependencies = {};
-      if (!pkgJson.devDependencies.strnd) {
-        pkgJson.devDependencies.strnd = `^${version}`;
+      if (!pkgJson.devDependencies.mapra) {
+        pkgJson.devDependencies.mapra = `^${version}`;
         modified = true;
       }
 
       if (modified) {
         fs.writeFileSync(pkgJsonPath, JSON.stringify(pkgJson, null, 2) + "\n");
-        console.log("Updated package.json (added strnd devDependency + prepare script)");
+        console.log("Updated package.json (added mapra devDependency + prepare script)");
       }
     } catch {
-      console.warn("\u26A0 Could not update package.json \u2014 add strnd manually");
+      console.warn("\u26A0 Could not update package.json \u2014 add mapra manually");
     }
   }
 
@@ -290,7 +290,7 @@ async function runGenerate(targetArg?: string, softFail = false, silent = false)
       await import("../encoder/strand-format-encode.js");
     const { getGitHash } = await import("../analyzer/git-hash.js");
 
-    const outputPath = path.join(targetPath, ".strand");
+    const outputPath = path.join(targetPath, ".mapra");
 
     if (!silent) console.log(`Scanning ${targetPath}`);
     const graph = await Promise.resolve(scanCodebase(targetPath));
@@ -325,7 +325,7 @@ async function runGenerate(targetArg?: string, softFail = false, silent = false)
       try { fs.unlinkSync(tmpPath); } catch { /* .tmp already renamed or gone */ }
     }
 
-    // Write query cache alongside .strand — failure is non-fatal
+    // Write query cache alongside .mapra — failure is non-fatal
     try {
       const { writeCache, ensureCacheInGitignore } = await import("../query/cache.js");
       const { execSync } = await import("child_process");
@@ -339,14 +339,14 @@ async function runGenerate(targetArg?: string, softFail = false, silent = false)
       ensureCacheInGitignore(targetPath);
     } catch (cacheErr) {
       if (!silent) {
-        console.warn(`\u26A0 Failed to write .strand-cache.json: ${cacheErr instanceof Error ? cacheErr.message : String(cacheErr)}`);
+        console.warn(`\u26A0 Failed to write .mapra-cache.json: ${cacheErr instanceof Error ? cacheErr.message : String(cacheErr)}`);
       }
     }
 
     if (!silent) {
       const timestamp = new Date().toISOString().replace(/\.\d{3}Z$/, "");
       console.log(
-        `\nWrote .strand  (${encoded.length.toLocaleString()} chars  ~${tokens} tokens)`,
+        `\nWrote .mapra  (${encoded.length.toLocaleString()} chars  ~${tokens} tokens)`,
       );
       console.log(SUPERSESSION_MESSAGE(timestamp));
     }
@@ -360,20 +360,20 @@ async function runInit(targetArg?: string) {
   const targetPath = resolveTarget(targetArg);
 
   try {
-    const strandPath = path.join(targetPath, ".strand");
+    const strandPath = path.join(targetPath, ".mapra");
     const claudePath = path.join(targetPath, "CLAUDE.md");
 
-    // Guard: .strand must exist and be non-empty
+    // Guard: .mapra must exist and be non-empty
     if (!fs.existsSync(strandPath)) {
-      console.error(`Error: .strand not found at ${strandPath}`);
-      console.error(`Run 'strnd generate' or 'strnd setup' first.`);
+      console.error(`Error: .mapra not found at ${strandPath}`);
+      console.error(`Run 'mapra generate' or 'mapra setup' first.`);
       process.exit(1);
     }
 
     const strandSize = fs.statSync(strandPath).size;
     if (strandSize < 100) {
       console.error(
-        `Warning: .strand appears malformed (${strandSize} bytes). Re-run 'strnd generate'.`,
+        `Warning: .mapra appears malformed (${strandSize} bytes). Re-run 'mapra generate'.`,
       );
       process.exit(1);
     }
@@ -382,20 +382,20 @@ async function runInit(targetArg?: string) {
       ? fs.readFileSync(claudePath, "utf-8")
       : null;
 
-    const { content, action } = applyStrandSection(existingContent);
+    const { content, action } = applyMapraSection(existingContent);
 
     if (action === "up-to-date") {
-      console.log(`Already up to date — CLAUDE.md has current strnd section`);
+      console.log(`Already up to date — CLAUDE.md has current mapra section`);
       return;
     }
 
     fs.writeFileSync(claudePath, content, "utf-8");
 
-    const messages: Record<Exclude<StrandAction, "up-to-date">, string> = {
-      created: `Created CLAUDE.md and wired @.strand`,
-      upgraded: `Upgraded strnd section in CLAUDE.md`,
+    const messages: Record<Exclude<MapraAction, "up-to-date">, string> = {
+      created: `Created CLAUDE.md and wired @.mapra`,
+      upgraded: `Upgraded mapra section in CLAUDE.md`,
       "legacy-upgraded": `Upgraded CLAUDE.md — added section markers for future updates`,
-      appended: `Wired — added @.strand reference to ${claudePath}`,
+      appended: `Wired — added @.mapra reference to ${claudePath}`,
     };
     console.log(messages[action]);
   } catch (err) {
@@ -405,15 +405,15 @@ async function runInit(targetArg?: string) {
 
 async function runStatus(targetArg?: string) {
   const targetPath = resolveTarget(targetArg);
-  const strandPath = path.join(targetPath, ".strand");
+  const strandPath = path.join(targetPath, ".mapra");
   const claudePath = path.join(targetPath, "CLAUDE.md");
   const gitignorePath = path.join(targetPath, ".gitignore");
 
   console.log(`Status for: ${targetPath}\n`);
 
-  // .strand presence and staleness
+  // .mapra presence and staleness
   if (!fs.existsSync(strandPath)) {
-    console.log(`  .strand       ✗ not found (run 'strnd setup')`);
+    console.log(`  .mapra        ✗ not found (run 'mapra setup')`);
   } else {
     const { parseStrandHeader } = await import("../encoder/parse-strand-header.js");
     const { getGitHash } = await import("../analyzer/git-hash.js");
@@ -437,28 +437,28 @@ async function runStatus(targetArg?: string) {
       }
     } else {
       const stale = sourceMtime > strandMtime;
-      staleStr = stale ? " \u26A0 may be stale (run 'strnd update')" : "";
+      staleStr = stale ? " \u26A0 may be stale (run 'mapra update')" : "";
     }
-    console.log(`  .strand       \u2713 present (updated ${ageStr})${staleStr}`);
+    console.log(`  .mapra        \u2713 present (updated ${ageStr})${staleStr}`);
   }
 
   // CLAUDE.md wiring
   if (!fs.existsSync(claudePath)) {
-    console.log(`  CLAUDE.md     ✗ not found (run 'strnd init')`);
+    console.log(`  CLAUDE.md     ✗ not found (run 'mapra init')`);
   } else {
     const content = fs.readFileSync(claudePath, "utf-8");
-    const wired = /^@\.strand$/m.test(content);
+    const wired = /^@\.mapra$/m.test(content);
     console.log(
-      `  CLAUDE.md     ${wired ? "✓ wired" : "✗ not wired (run 'strnd init')"}`,
+      `  CLAUDE.md     ${wired ? "✓ wired" : "✗ not wired (run 'mapra init')"}`,
     );
   }
 
   // .gitignore check
   if (fs.existsSync(gitignorePath)) {
     const gitignore = fs.readFileSync(gitignorePath, "utf-8");
-    if (/^\.?strand$/m.test(gitignore) || /^\*\.strand$/m.test(gitignore)) {
+    if (/^\.?mapra$/m.test(gitignore) || /^\*\.mapra$/m.test(gitignore)) {
       console.log(
-        `  .gitignore    ⚠ .strand appears to be ignored — collaborators won't have the map`,
+        `  .gitignore    ⚠ .mapra appears to be ignored — collaborators won't have the map`,
       );
     }
   }
@@ -469,23 +469,23 @@ async function runStatus(targetArg?: string) {
     const postCommit = path.join(hooksDir, "post-commit");
     if (fs.existsSync(postCommit)) {
       const content = fs.readFileSync(postCommit, "utf-8");
-      const hasStrnd = content.includes(STRND_HOOK_START);
+      const hasStrnd = content.includes(MAPRA_HOOK_START);
       console.log(
-        `  git hooks     ${hasStrnd ? "\u2713 installed" : "\u2717 not installed (run 'strnd setup')"}`,
+        `  git hooks     ${hasStrnd ? "\u2713 installed" : "\u2717 not installed (run 'mapra setup')"}`,
       );
     } else {
-      console.log(`  git hooks     \u2717 not installed (run 'strnd setup')`);
+      console.log(`  git hooks     \u2717 not installed (run 'mapra setup')`);
     }
   } else {
     console.log(`  git hooks     \u2717 no .git directory`);
   }
 
-  // .strnd/hook.mjs check
-  const shimPath = path.join(targetPath, ".strnd", "hook.mjs");
+  // .mapra/hook.mjs check
+  const shimPath = path.join(targetPath, ".mapra", "hook.mjs");
   if (fs.existsSync(shimPath)) {
     console.log(`  hook shim     \u2713 present`);
   } else {
-    console.log(`  hook shim     \u2717 not found (run 'strnd setup')`);
+    console.log(`  hook shim     \u2717 not found (run 'mapra setup')`);
   }
 
   console.log();
@@ -493,10 +493,10 @@ async function runStatus(targetArg?: string) {
 
 async function runCheck(targetArg?: string, failIfStale = false) {
   const targetPath = resolveTarget(targetArg);
-  const strandPath = path.join(targetPath, ".strand");
+  const strandPath = path.join(targetPath, ".mapra");
 
   if (!fs.existsSync(strandPath)) {
-    console.error(".strand not found. Run 'strnd setup' or 'strnd generate' first.");
+    console.error(".mapra not found. Run 'mapra setup' or 'mapra generate' first.");
     process.exit(1);
   }
 
@@ -508,7 +508,7 @@ async function runCheck(targetArg?: string, failIfStale = false) {
   const header = parseStrandHeader(strandContent);
 
   if (!header) {
-    console.error(".strand header is malformed. Run 'strnd generate' to regenerate.");
+    console.error(".mapra header is malformed. Run 'mapra generate' to regenerate.");
     process.exit(1);
   }
 
@@ -516,15 +516,15 @@ async function runCheck(targetArg?: string, failIfStale = false) {
 
   // Case 1: No git available
   if (!currentHash) {
-    console.log(`.strand generated ${header.timestamp} (not a git repo — cannot compare)`);
+    console.log(`.mapra generated ${header.timestamp} (not a git repo — cannot compare)`);
     process.exit(0);
   }
 
-  // Case 2: Legacy .strand without git hash
+  // Case 2: Legacy .mapra without git hash
   if (!header.gitHash) {
-    console.log(`.strand generated ${header.timestamp} (no git hash in header — run 'strnd update' to add)`);
+    console.log(`.mapra generated ${header.timestamp} (no git hash in header — run 'mapra update' to add)`);
     if (failIfStale) {
-      console.log("Cannot determine staleness without git hash in .strand header.");
+      console.log("Cannot determine staleness without git hash in .mapra header.");
       process.exit(1);
     }
     process.exit(0);
@@ -532,7 +532,7 @@ async function runCheck(targetArg?: string, failIfStale = false) {
 
   // Case 3: Current — hashes match
   if (header.gitHash === currentHash) {
-    console.log(`.strand is current (generated at commit ${header.gitHash}, HEAD is ${currentHash})`);
+    console.log(`.mapra is current (generated at commit ${header.gitHash}, HEAD is ${currentHash})`);
     process.exit(0);
   }
 
@@ -562,11 +562,11 @@ async function runCheck(targetArg?: string, failIfStale = false) {
     // git diff may fail if the generation commit is not in history
   }
 
-  console.log(`.strand may be stale:`);
+  console.log(`.mapra may be stale:`);
   console.log(`  Generated: ${header.timestamp} (commit ${header.gitHash})`);
   console.log(`  Current HEAD: ${currentHash} (${commitsAhead} commits ahead)`);
   console.log(`  Changed files since generation: ${changedFiles}`);
-  console.log(`  Run 'strnd update' to refresh.`);
+  console.log(`  Run 'mapra update' to refresh.`);
 
   if (failIfStale) {
     process.exit(1);
@@ -581,7 +581,7 @@ async function runValidatePlan(
   checkpoints = false,
 ) {
   if (!planArg) {
-    console.error("Usage: strnd validate-plan <plan.md> [--since YYYY-MM-DD] [--checkpoints]");
+    console.error("Usage: mapra validate-plan <plan.md> [--since YYYY-MM-DD] [--checkpoints]");
     process.exit(1);
   }
 
@@ -591,29 +591,29 @@ async function runValidatePlan(
     process.exit(1);
   }
 
-  // Find project root (walk up to find .strand)
+  // Find project root (walk up to find .mapra)
   let projectRoot = path.dirname(planPath);
   while (projectRoot !== path.dirname(projectRoot)) {
-    if (fs.existsSync(path.join(projectRoot, ".strand"))) break;
+    if (fs.existsSync(path.join(projectRoot, ".mapra"))) break;
     projectRoot = path.dirname(projectRoot);
   }
 
-  const strandPath = path.join(projectRoot, ".strand");
+  const strandPath = path.join(projectRoot, ".mapra");
   if (!fs.existsSync(strandPath)) {
-    console.error("Error: no .strand file found. Run 'strnd generate' first.");
+    console.error("Error: no .mapra file found. Run 'mapra generate' first.");
     process.exit(1);
   }
 
-  // Staleness check: warn if .strand is older than newest source file
+  // Staleness check: warn if .mapra is older than newest source file
   const strandMtime = fs.statSync(strandPath).mtimeMs;
   const sourceMtime = newestSourceFileMtime(projectRoot);
   if (sourceMtime > strandMtime) {
     const ageDays = Math.floor((Date.now() - strandMtime) / 86_400_000);
     console.warn(
-      `Warning: .strand is ${ageDays > 0 ? `${ageDays}d` : "<1d"} old and source files have changed since.`,
+      `Warning: .mapra is ${ageDays > 0 ? `${ageDays}d` : "<1d"} old and source files have changed since.`,
     );
     console.warn(
-      `Run 'strnd generate' first for accurate churn and risk data.\n`,
+      `Run 'mapra generate' first for accurate churn and risk data.\n`,
     );
   }
 
@@ -810,10 +810,10 @@ async function runValidatePlan(
         console.log(`  \u26A0 ${w}`);
       }
       console.log(
-        `\n  Add [CHECKPOINT] steps after architectural changes: run \`strnd update\`,`,
+        `\n  Add [CHECKPOINT] steps after architectural changes: run \`mapra update\`,`,
       );
       console.log(
-        `  then use the Read tool or \`cat .strand\` to load fresh data into context.`,
+        `  then use the Read tool or \`cat .mapra\` to load fresh data into context.`,
       );
     } else {
       console.log("\nCHECKPOINTS: all architectural steps have checkpoints.");
@@ -823,7 +823,7 @@ async function runValidatePlan(
 
 async function runBatchCommand(configArg?: string, resume?: boolean, smart?: boolean) {
   if (!configArg) {
-    console.error("Usage: strnd batch <config.json> [--resume] [--smart]");
+    console.error("Usage: mapra batch <config.json> [--resume] [--smart]");
     process.exit(1);
   }
 
@@ -835,7 +835,7 @@ async function runBatchCommand(configArg?: string, resume?: boolean, smart?: boo
 
   if (!process.env["ANTHROPIC_API_KEY"]) {
     console.error("Error: ANTHROPIC_API_KEY environment variable is required");
-    console.error("  Set it: ANTHROPIC_API_KEY=sk-... strnd batch <config>");
+    console.error("  Set it: ANTHROPIC_API_KEY=sk-... mapra batch <config>");
     process.exit(1);
   }
 
@@ -852,7 +852,7 @@ async function runAnalyzeCommand(
   options: { advise: boolean; apply: boolean; judgeCheck: boolean },
 ) {
   if (files.length === 0) {
-    console.error("Usage: strnd analyze <results.json> [results2.json] [--advise] [--apply] [--judge-check]");
+    console.error("Usage: mapra analyze <results.json> [results2.json] [--advise] [--apply] [--judge-check]");
     process.exit(1);
   }
 
@@ -942,7 +942,7 @@ function handleError(command: string, err: unknown): never {
   console.error(`Error: ${command} failed unexpectedly`);
   if (err instanceof Error) console.error(err.message);
   console.error(
-    `\nPlease report this at https://github.com/joellopezjl96/strnd/issues`,
+    `\nPlease report this at https://github.com/joellopezjl96/mapra/issues`,
   );
   process.exit(1);
 }

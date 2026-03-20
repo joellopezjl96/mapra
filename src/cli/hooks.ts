@@ -2,25 +2,25 @@ import * as fs from "fs";
 import * as path from "path";
 import { execFileSync } from "child_process";
 
-export const STRND_HOOK_START = "# --- strnd auto-update (do not edit) ---";
-export const STRND_HOOK_END = "# --- end strnd ---";
+export const MAPRA_HOOK_START = "# --- mapra auto-update (do not edit) ---";
+export const MAPRA_HOOK_END = "# --- end mapra ---";
 
 const HOOK_TYPES = ["post-commit", "post-merge", "post-checkout"] as const;
 type HookType = (typeof HOOK_TYPES)[number];
 
 export function generateTrampoline(hookType: HookType): string {
-  const lines = ["#!/bin/sh", STRND_HOOK_START];
+  const lines = ["#!/bin/sh", MAPRA_HOOK_START];
 
   if (hookType === "post-checkout") {
     // $3=1 means branch switch; $3=0 means file checkout — skip file checkouts
     lines.push(
-      '[ "$3" = "1" ] && [ -f .strnd/hook.mjs ] && node .strnd/hook.mjs &',
+      '[ "$3" = "1" ] && [ -f .mapra/hook.mjs ] && node .mapra/hook.mjs &',
     );
   } else {
-    lines.push("[ -f .strnd/hook.mjs ] && node .strnd/hook.mjs &");
+    lines.push("[ -f .mapra/hook.mjs ] && node .mapra/hook.mjs &");
   }
 
-  lines.push(STRND_HOOK_END, "");
+  lines.push(MAPRA_HOOK_END, "");
   return lines.join("\n");
 }
 
@@ -32,7 +32,7 @@ export function installHook(hooksDir: string, hookType: HookType): void {
     const existing = fs.readFileSync(hookPath, "utf-8");
 
     // Already installed — skip
-    if (existing.includes(STRND_HOOK_START)) return;
+    if (existing.includes(MAPRA_HOOK_START)) return;
 
     // Append to existing hook
     const separator = existing.endsWith("\n") ? "" : "\n";
@@ -55,15 +55,15 @@ export function uninstallHook(hooksDir: string, hookType: HookType): void {
   if (!fs.existsSync(hookPath)) return;
 
   const content = fs.readFileSync(hookPath, "utf-8");
-  if (!content.includes(STRND_HOOK_START)) return;
+  if (!content.includes(MAPRA_HOOK_START)) return;
 
-  // Remove the strnd block (including markers)
-  const startIdx = content.indexOf(STRND_HOOK_START);
-  const endIdx = content.indexOf(STRND_HOOK_END);
+  // Remove the mapra block (including markers)
+  const startIdx = content.indexOf(MAPRA_HOOK_START);
+  const endIdx = content.indexOf(MAPRA_HOOK_END);
   if (startIdx === -1 || endIdx === -1) return;
 
   const before = content.slice(0, startIdx);
-  const after = content.slice(endIdx + STRND_HOOK_END.length + 1); // +1 for trailing \n
+  const after = content.slice(endIdx + MAPRA_HOOK_END.length + 1); // +1 for trailing \n
 
   const remaining = (before + after).trim();
 
@@ -111,7 +111,7 @@ export function getHooksDir(targetPath: string): string | null {
 }
 
 /**
- * Install all three strnd hook trampolines.
+ * Install all three mapra hook trampolines.
  */
 export function installAllHooks(targetPath: string): { installed: string[]; skipped: string | null } {
   const hooksDir = getHooksDir(targetPath);
@@ -132,7 +132,7 @@ export function installAllHooks(targetPath: string): { installed: string[]; skip
 }
 
 /**
- * Uninstall all strnd hook trampolines.
+ * Uninstall all mapra hook trampolines.
  */
 export function uninstallAllHooks(targetPath: string): void {
   const hooksDir = getHooksDir(targetPath);

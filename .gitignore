@@ -1,7 +1,7 @@
 node_modules/
 dist/
 experiments/output/
-experiments/output/*.strand
+experiments/output/*.mapra
 experiments/*.js
 experiments/*.js.map
 experiments/*.d.ts
@@ -19,3 +19,4 @@ docs/plans/
 experiments/configs/
 experiments/experiments/
 FINDINGS.md
+.mapra-cache.json

@@ -3,8 +3,8 @@ import * as fs from "fs";
 import * as path from "path";
 import {
   generateTrampoline,
-  STRND_HOOK_START,
-  STRND_HOOK_END,
+  MAPRA_HOOK_START,
+  MAPRA_HOOK_END,
   installHook,
   uninstallHook,
 } from "../hooks.js";
@@ -13,7 +13,7 @@ describe("generateTrampoline", () => {
   it("post-commit trampoline runs hook.mjs in background", () => {
     const content = generateTrampoline("post-commit");
     expect(content).toContain("#!/bin/sh");
-    expect(content).toContain(".strnd/hook.mjs");
+    expect(content).toContain(".mapra/hook.mjs");
     expect(content).toContain("&");
     expect(content).not.toContain("$3");
   });
@@ -21,7 +21,7 @@ describe("generateTrampoline", () => {
   it("post-checkout trampoline filters by branch switch ($3=1)", () => {
     const content = generateTrampoline("post-checkout");
     expect(content).toContain('[ "$3" = "1" ]');
-    expect(content).toContain(".strnd/hook.mjs");
+    expect(content).toContain(".mapra/hook.mjs");
   });
 
   it("all trampolines use LF line endings (no CRLF)", () => {
@@ -47,9 +47,9 @@ describe("installHook", () => {
   it("creates hook file when none exists", () => {
     installHook(hooksDir, "post-commit");
     const content = fs.readFileSync(path.join(hooksDir, "post-commit"), "utf-8");
-    expect(content).toContain(STRND_HOOK_START);
-    expect(content).toContain(STRND_HOOK_END);
-    expect(content).toContain(".strnd/hook.mjs");
+    expect(content).toContain(MAPRA_HOOK_START);
+    expect(content).toContain(MAPRA_HOOK_END);
+    expect(content).toContain(".mapra/hook.mjs");
   });
 
   it("appends to existing hook file", () => {
@@ -58,14 +58,14 @@ describe("installHook", () => {
     installHook(hooksDir, "post-commit");
     const content = fs.readFileSync(path.join(hooksDir, "post-commit"), "utf-8");
     expect(content).toContain("existing hook");
-    expect(content).toContain(STRND_HOOK_START);
+    expect(content).toContain(MAPRA_HOOK_START);
   });
 
   it("is idempotent — does not duplicate on second install", () => {
     installHook(hooksDir, "post-commit");
     installHook(hooksDir, "post-commit");
     const content = fs.readFileSync(path.join(hooksDir, "post-commit"), "utf-8");
-    const count = content.split(STRND_HOOK_START).length - 1;
+    const count = content.split(MAPRA_HOOK_START).length - 1;
     expect(count).toBe(1);
   });
 });
@@ -82,17 +82,17 @@ describe("uninstallHook", () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it("removes strnd block from hook file, preserving other content", () => {
+  it("removes mapra block from hook file, preserving other content", () => {
     const existing = "#!/bin/sh\necho 'keep me'\n";
     fs.writeFileSync(path.join(hooksDir, "post-commit"), existing);
     installHook(hooksDir, "post-commit");
     uninstallHook(hooksDir, "post-commit");
     const content = fs.readFileSync(path.join(hooksDir, "post-commit"), "utf-8");
     expect(content).toContain("keep me");
-    expect(content).not.toContain(STRND_HOOK_START);
+    expect(content).not.toContain(MAPRA_HOOK_START);
   });
 
-  it("deletes hook file if strnd was the only content", () => {
+  it("deletes hook file if mapra was the only content", () => {
     installHook(hooksDir, "post-commit");
     uninstallHook(hooksDir, "post-commit");
     expect(fs.existsSync(path.join(hooksDir, "post-commit"))).toBe(false);

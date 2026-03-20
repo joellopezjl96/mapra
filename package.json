@@ -1,14 +1,14 @@
 {
-  "name": "strnd",
+  "name": "mapra",
   "version": "0.1.0",
   "description": "Codebase intelligence for AI agents — stop exploring, start building",
   "repository": {
     "type": "git",
-    "url": "https://github.com/joellopezjl96/strnd"
+    "url": "https://github.com/joellopezjl96/mapra"
   },
   "type": "module",
   "bin": {
-    "strnd": "dist/cli/index.js"
+    "mapra": "dist/cli/index.js"
   },
   "scripts": {
     "build": "tsc",

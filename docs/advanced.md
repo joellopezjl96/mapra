@@ -2,16 +2,16 @@
 
 ## validate-plan
 
-Cross-reference an implementation plan's file paths against your `.strand` data. Catches stale files, high-cascade risks, dead code references, and missing conventions before you start coding.
+Cross-reference an implementation plan's file paths against your `.mapra` data. Catches stale files, high-cascade risks, dead code references, and missing conventions before you start coding.
 
 ```bash
-strnd validate-plan docs/plans/my-feature.md
+mapra validate-plan docs/plans/my-feature.md
 ```
 
 ### Flags
 
 - `--since YYYY-MM-DD` — only flag files modified after this date
-- `--checkpoints` — warn if architectural changes lack `[CHECKPOINT]` steps (points where you should run `strnd update` mid-plan)
+- `--checkpoints` — warn if architectural changes lack `[CHECKPOINT]` steps (points where you should run `mapra update` mid-plan)
 
 ### Output sections
 
@@ -41,14 +41,14 @@ HIGH CASCADE (amplification >= 2.0):
 SUMMARY: 1 stale, 1 high-cascade, 0 dead-code, 2 new files
 ```
 
-## The .strand Format
+## The .mapra Format
 
-A `.strand` file is plain text, designed to be read by both humans and LLMs. Here's what each part means.
+A `.mapra` file is plain text, designed to be read by both humans and LLMs. Here's what each part means.
 
 ### Header line
 
 ```
-STRAND v3 | myapp | Nextjs | 300 files | 53,081 lines | generated 2026-03-06T23:49:06
+MAPRA v3 | myapp | Nextjs | 300 files | 53,081 lines | generated 2026-03-06T23:49:06
 ```
 
 Format version, project name, detected framework, file/line counts, generation timestamp.
@@ -131,21 +131,21 @@ Files unreachable from the import graph. Candidates for deletion.
 
 ## CI / Automation
 
-The `strnd check --fail-if-stale` command exits with code 1 when `.strand` is out of date, making it ideal for CI gates and pre-commit hooks.
+The `mapra check --fail-if-stale` command exits with code 1 when `.mapra` is out of date, making it ideal for CI gates and pre-commit hooks.
 
 ### GitHub Actions
 
 ```yaml
-name: Check .strand freshness
+name: Check .mapra freshness
 on: [pull_request]
 jobs:
-  strand-check:
+  mapra-check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 20 }
-      - run: npx strnd check --fail-if-stale
+      - run: npx mapra check --fail-if-stale
 ```
 
 ### Pre-commit hook (via pre-commit framework)
@@ -154,21 +154,21 @@ jobs:
 repos:
   - repo: local
     hooks:
-      - id: strand-freshness
-        name: Check .strand freshness
-        entry: npx strnd check --fail-if-stale
+      - id: mapra-freshness
+        name: Check .mapra freshness
+        entry: npx mapra check --fail-if-stale
         language: system
         pass_filenames: false
 ```
 
 ## Experiment Tooling
 
-Strnd includes a batch experiment runner for systematically testing encoding effectiveness. This is primarily for strnd development, but available to anyone.
+Mapra includes a batch experiment runner for systematically testing encoding effectiveness. This is primarily for mapra development, but available to anyone.
 
 ### Running experiments
 
 ```bash
-strnd batch experiments/configs/my-experiment.json [--resume] [--smart]
+mapra batch experiments/configs/my-experiment.json [--resume] [--smart]
 ```
 
 - `--resume` — continue from checkpoint if a run was interrupted
@@ -178,16 +178,16 @@ strnd batch experiments/configs/my-experiment.json [--resume] [--smart]
 
 ```bash
 # Free analysis: stats, diagnostics, budget waste estimate
-strnd analyze results.json
+mapra analyze results.json
 
 # Haiku-powered suggestions (~$0.05)
-strnd analyze results.json --advise
+mapra analyze results.json --advise
 
 # Judge consistency check (~$0.02)
-strnd analyze results.json --judge-check
+mapra analyze results.json --judge-check
 
 # Compare two runs (before/after iteration)
-strnd analyze old-results.json new-results.json
+mapra analyze old-results.json new-results.json
 ```
 
 ### Analysis output
@@ -209,7 +209,7 @@ Experiment configs are JSON files. See `experiments/configs/` for examples. Key 
   "description": "What you're testing",
   "codebases": [{ "name": "myapp", "path": "/path/to/codebase" }],
   "conditions": [
-    { "id": "full", "name": "Strand full", "model": "claude-sonnet-4-6", "encoding": "strand-v3" },
+    { "id": "full", "name": "Mapra full", "model": "claude-sonnet-4-6", "encoding": "mapra-v3" },
     { "id": "none", "name": "No context", "model": "claude-sonnet-4-6", "encoding": "none" }
   ],
   "questions": [
@@ -235,7 +235,7 @@ Conditions can use `excludeSections` to test which sections matter:
   "id": "no-risk",
   "name": "Without RISK",
   "model": "claude-sonnet-4-6",
-  "encoding": "strand-v3",
+  "encoding": "mapra-v3",
   "excludeSections": ["RISK"]
 }
 ```

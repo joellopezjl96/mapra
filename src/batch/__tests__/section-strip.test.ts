@@ -115,10 +115,10 @@ describe("section stripping", () => {
     expect(stripped).not.toMatch(/\n{3,}/);
   });
 
-  it("preserves the STRAND header after stripping", () => {
+  it("preserves the MAPRA header after stripping", () => {
     const encoding = encodeToStrandFormat(makeGraph(), makeAnalysis());
     const stripped = stripSection(encoding, "RISK");
 
-    expect(stripped).toMatch(/^STRAND v3 \|/);
+    expect(stripped).toMatch(/^MAPRA v3 \|/);
   });
 });

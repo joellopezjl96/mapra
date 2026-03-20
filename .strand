@@ -1,51 +1,48 @@
-STRAND v3 | strand | Typescript | 76 files | 12,629 lines | generated 2026-03-07T05:21:49
-LEGEND: ×N=imported by N files | ═/·=coupling strong/weak | ×A→B=A direct, B total affected | dN=cascade depth | [AMP]=amplification≥2x | TN=N test files | NL=lines of code
-USAGE: planning→RISK,CONVENTIONS,INFRASTRUCTURE | debugging→FLOWS,CHURN,HOTSPOTS | refactoring→RISK,CHURN | review→CONVENTIONS,RISK,CHURN | impact-analysis→RISK,INFRASTRUCTURE
+STRAND v3 | strand | Typescript | 113 files | 18,171 lines | generated 2026-03-16T02:56:18 | git:17d4188
+LEGEND: ×N=imported by N files | ═/·=coupling strong/weak | ×A→B=A direct, B total affected | dN=cascade depth | [AMP]=amplification≥2x | TN=N test files | NL=lines of code | Nx=co-change count | linked/no-import=import connection
+USAGE: planning→RISK,CONVENTIONS,INFRASTRUCTURE | debugging→FLOWS,CHURN,CO-CHANGE | refactoring→RISK,CHURN,CO-CHANGE | review→CONVENTIONS,RISK,CHURN | impact-analysis→RISK,CO-CHANGE
 
 ─── CHURN (last 30 days, top movers) ─────────────────────
-26 commits   +960 -137    src/cli/index.ts  "fix: address code review issues (I-1 through I-6)"
-18 commits   +810 -227    src/encoder/strand-format-encode.ts  "feat(encoder): remove TERRAIN and DOMAINS secti..."
-13 commits   +1323 -17    FINDINGS.md  "feat(encoder): remove TERRAIN and DOMAINS secti..."
-8 commits    +75 -23      package.json  "chore: remove dead tree-sitter dependencies (sc..."
-7 commits    +141 -105    .strand  "feat(encoder): remove TERRAIN and DOMAINS secti..."
+28 commits   +1106 -141   src/cli/index.ts  "feat(query): wire strand query command into CLI..."
+26 commits   +973 -282    src/encoder/strand-format-encode.ts  "feat(encoder): tiered RISK selection — 5 infras..."
+12 commits   +701 -45     src/scanner/index.ts  "feat(scanner): framework-agnostic entry point d..."
+11 commits   +111 -14     src/analyzer/index.ts  "feat(analyzer): exclude DI-managed entry points..."
+7 commits    +161 -2      src/cli/templates.ts  "feat(query): add query discovery to CLAUDE.md t..."
+7 commits    +706 -10     src/batch/analyzer.ts  "feat(batch): add prompt prefix support, tool-ca..."
+7 commits    +652 -52     src/batch/runner.ts  "feat(batch): add prompt prefix support, tool-ca..."
+7 commits    +206 -5      src/batch/types.ts  "feat(batch): add prompt prefix support, tool-ca..."
 7 commits    +180 -0      src/cli/__tests__/templates.test.ts  "feat(cli): add freshness carve-out to CLAUDE_MD..."
-7 commits    +636 -22     src/scanner/index.ts  "fix(q1): fix detectDomain() fallback + add DOMA..."
-6 commits    +585 -43     src/batch/runner.ts  "feat(batch): auto-print analysis report after b..."
-6 commits    +652 -9      src/batch/analyzer.ts  "fix: address code review issues (I-1 through I-6)"
-6 commits    +192 -5      src/batch/types.ts  "fix: address code review issues (I-1 through I-6)"
+6 commits    +103 -0      src/encoder/__tests__/risk-render.test.ts  "feat: co-change patterns, convention violations..."
 
-─── HOTSPOTS (complexity > 0.3) ─────────────────────────
-0.79  src/batch/runner.ts                                   543L 13imp 
-0.77  experiments/archive/visual-vs-text.ts                 558L 12imp 
-0.75  src/cli/index.ts                                      833L  5imp 
-0.65  experiments/archive/experiment-3-formats.ts           432L 11imp 
-0.58  experiments/experiment-6-model-tiers.ts               457L  8imp 
-0.57  experiments/experiment-5-generalization.ts            446L  8imp 
-0.55  experiments/experiment-8-comprehension.ts             465L  7imp 
-0.54  experiments/experiment-4-strand-v2.ts                 406L  8imp 
-0.53  src/encoder/strand-format-encode.ts                   604L  3imp 
-0.50  src/scanner/index.ts                                  615L  2imp 
+─── CO-CHANGE (files that change together) ───────────────
+6×    __tests__/risk-render.test.ts ↔ encoder/strand-format-encode.ts  (100% no-import)
+5×    __tests__/analyzer.test.ts ↔ batch/analyzer.ts  (83% no-import)
+5×    __tests__/templates.test.ts ↔ cli/templates.ts  (83% no-import)
+6×    analyzer/index.ts ↔ encoder/strand-format-encode.ts  (60% no-import)
+3×    __tests__/noise-filter.test.ts ↔ analyzer/index.ts  (100% no-import)
+4×    batch/runner.ts ↔ batch/types.ts  (67% no-import)
+4×    __tests__/templates.test.ts ↔ cli/index.ts  (57% no-import)
 
 ─── INFRASTRUCTURE ──────────────────────────────────────
 Inter-module dependency roads
 
 
 ─── TEST COVERAGE ───────────────────────────────────────
-18 test files | 0/57 testable files with direct test edges (0.0%)
-─── DEAD CODE (57 unreachable files) ─────────────────
+44 test files | 0/68 testable files with direct test edges (0.0%)
+─── DEAD CODE (56 unreachable files) ─────────────────
 experiments/archive/experiment-3-formats.ts
 experiments/archive/visual-vs-text.ts
-experiments/experiment-4-strand-v2.d.ts
 experiments/experiment-4-strand-v2.js
 experiments/experiment-4-strand-v2.ts
-experiments/experiment-5-generalization.d.ts
 experiments/experiment-5-generalization.js
 experiments/experiment-5-generalization.ts
 experiments/experiment-6-model-tiers.ts
 experiments/experiment-8-comprehension.ts
-experiments/validate-blast-radius.d.ts
 experiments/validate-blast-radius.js
 experiments/validate-blast-radius.ts
-scripts/generate-strand.d.ts
 scripts/generate-strand.js
-+42 more
+scripts/generate-strand.ts
+scripts/validate-workspace-resolution.ts
+scripts/verify-task1.js
+scripts/verify-task10.js
++41 more

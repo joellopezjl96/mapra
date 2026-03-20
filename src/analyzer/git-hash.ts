@@ -1,7 +1,7 @@
 /**
  * Git Hash Utility — resolves the current HEAD short hash.
  *
- * Used to embed commit identity in .strand headers for staleness detection.
+ * Used to embed commit identity in .mapra headers for staleness detection.
  */
 
 import { execSync } from "child_process";

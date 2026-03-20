@@ -1,4 +1,4 @@
-// src/query/cache.ts
+// src/query/cache.ts — mapra cache management
 import * as fs from "fs";
 import * as path from "path";
 import { execSync } from "child_process";
@@ -6,7 +6,7 @@ import type { StrandGraph } from "../scanner/index.js";
 import type { GraphAnalysis } from "../analyzer/index.js";
 import type { ChurnResult } from "../analyzer/churn.js";
 
-export interface StrandCache {
+export interface MapraCache {
   version: 1;
   generated: string;
   gitHead?: string;
@@ -15,7 +15,7 @@ export interface StrandCache {
 }
 
 /** JSON-safe shape where churn is a plain object instead of Map. */
-interface StrandCacheJSON {
+interface MapraCacheJSON {
   version: 1;
   generated: string;
   gitHead?: string;
@@ -26,7 +26,7 @@ interface StrandCacheJSON {
 }
 
 /**
- * Serialize StrandGraph + GraphAnalysis to .strand-cache.json.
+ * Serialize StrandGraph + GraphAnalysis to .mapra-cache.json.
  * Uses atomic write (tmp + rename) for safety.
  */
 export function writeCache(
@@ -35,7 +35,7 @@ export function writeCache(
   analysis: GraphAnalysis,
   gitHead?: string,
 ): void {
-  const cache: StrandCacheJSON = {
+  const cache: MapraCacheJSON = {
     version: 1,
     generated: new Date().toISOString(),
     ...(gitHead !== undefined ? { gitHead } : {}),
@@ -46,7 +46,7 @@ export function writeCache(
     },
   };
 
-  const cachePath = path.join(targetPath, ".strand-cache.json");
+  const cachePath = path.join(targetPath, ".mapra-cache.json");
   const tmpPath = cachePath + ".tmp";
   const json = JSON.stringify(cache, null, 2);
 
@@ -61,33 +61,33 @@ export function writeCache(
 }
 
 /**
- * Load and validate .strand-cache.json from the given directory,
+ * Load and validate .mapra-cache.json from the given directory,
  * walking up to git root if not found in startDir.
  */
-export function loadCache(startDir?: string): StrandCache {
+export function loadCache(startDir?: string): MapraCache {
   const dir = startDir ?? process.cwd();
   const cachePath = findCacheFile(dir);
 
   if (!cachePath) {
-    throw new Error("No .strand-cache.json found. Run 'strnd generate' first.");
+    throw new Error("No .mapra-cache.json found. Run 'mapra generate' first.");
   }
 
   let raw: string;
   try {
     raw = fs.readFileSync(cachePath, "utf-8");
   } catch {
-    throw new Error("No .strand-cache.json found. Run 'strnd generate' first.");
+    throw new Error("No .mapra-cache.json found. Run 'mapra generate' first.");
   }
 
-  let data: StrandCacheJSON;
+  let data: MapraCacheJSON;
   try {
-    data = JSON.parse(raw) as StrandCacheJSON;
+    data = JSON.parse(raw) as MapraCacheJSON;
   } catch {
-    throw new Error(".strand-cache.json is corrupted. Run 'strnd generate' to rebuild.");
+    throw new Error(".mapra-cache.json is corrupted. Run 'mapra generate' to rebuild.");
   }
 
   if (data.version !== 1) {
-    throw new Error("Cache format is incompatible. Run 'strnd generate' to rebuild.");
+    throw new Error("Cache format is incompatible. Run 'mapra generate' to rebuild.");
   }
 
   return {
@@ -103,7 +103,7 @@ export function loadCache(startDir?: string): StrandCache {
  * Check if cache is stale relative to current git HEAD.
  * Returns a warning string, or null if current/not-git.
  */
-export function checkStaleness(cache: StrandCache): string | null {
+export function checkStaleness(cache: MapraCache): string | null {
   if (!cache.gitHead) return null;
 
   try {
@@ -119,9 +119,9 @@ export function checkStaleness(cache: StrandCache): string | null {
         `git rev-list --count ${cache.gitHead}..HEAD`,
         { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] },
       ).trim();
-      return `\u26A0 cache generated before ${count} commits \u2014 run 'strnd generate' to refresh`;
+      return `\u26A0 cache generated before ${count} commits \u2014 run 'mapra generate' to refresh`;
     } catch {
-      return "\u26A0 cache may be stale \u2014 run 'strnd generate' to refresh";
+      return "\u26A0 cache may be stale \u2014 run 'mapra generate' to refresh";
     }
   } catch {
     return null;
@@ -129,11 +129,11 @@ export function checkStaleness(cache: StrandCache): string | null {
 }
 
 /**
- * Append `.strand-cache.json` to .gitignore if not already present.
+ * Append `.mapra-cache.json` to .gitignore if not already present.
  */
 export function ensureCacheInGitignore(targetPath: string): void {
   const gitignorePath = path.join(targetPath, ".gitignore");
-  const entry = ".strand-cache.json";
+  const entry = ".mapra-cache.json";
 
   let content = "";
   try {
@@ -146,7 +146,7 @@ export function ensureCacheInGitignore(targetPath: string): void {
   fs.writeFileSync(gitignorePath, content + separator + entry + "\n", "utf-8");
 }
 
-/** Walk up from startDir to git root looking for .strand-cache.json. */
+/** Walk up from startDir to git root looking for .mapra-cache.json. */
 function findCacheFile(startDir: string): string | null {
   let dir = path.resolve(startDir);
 
@@ -162,7 +162,7 @@ function findCacheFile(startDir: string): string | null {
   } catch { /* not a git repo */ }
 
   while (true) {
-    const candidate = path.join(dir, ".strand-cache.json");
+    const candidate = path.join(dir, ".mapra-cache.json");
     if (fs.existsSync(candidate)) return candidate;
     if (gitRoot && path.resolve(dir) === gitRoot) return null;
     const parent = path.dirname(dir);

@@ -14,7 +14,7 @@ export async function runQueryCommand(args: string[]): Promise<void> {
   const fileArg = positionalArgs[1];
 
   if (!queryType || !fileArg) {
-    console.error("Usage: strnd query <type> <file> [--json]");
+    console.error("Usage: mapra query <type> <file> [--json]");
     console.error(`Types: ${QUERY_TYPES.join(", ")}`);
     process.exit(1);
   }

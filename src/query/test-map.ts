@@ -1,6 +1,6 @@
 // src/query/test-map.ts
 import { buildReverseAdjacency, bfsWithParents } from "../analyzer/graph-utils.js";
-import type { StrandCache } from "./cache.js";
+import type { MapraCache } from "./cache.js";
 
 export interface TestMapResult {
   file: string;
@@ -9,7 +9,7 @@ export interface TestMapResult {
   transitiveTests: Array<{ test: string; via: string }>;
 }
 
-export function queryTestMap(fileId: string, cache: StrandCache): TestMapResult {
+export function queryTestMap(fileId: string, cache: MapraCache): TestMapResult {
   // Build reverse adjacency WITHOUT excluding test edges —
   // the goal is specifically to find test files in the import chain
   const reverseAdj = buildReverseAdjacency(cache.graph.edges, false);

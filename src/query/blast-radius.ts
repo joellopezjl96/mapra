@@ -1,7 +1,7 @@
 // src/query/blast-radius.ts
 import * as path from "path";
 import { buildReverseAdjacency, bfsWithParents, getModuleId } from "../analyzer/graph-utils.js";
-import type { StrandCache } from "./cache.js";
+import type { MapraCache } from "./cache.js";
 
 export interface BlastRadiusResult {
   file: string;
@@ -14,7 +14,7 @@ export interface BlastRadiusResult {
   cascadePath: string[];
 }
 
-export function queryBlastRadius(fileId: string, cache: StrandCache): BlastRadiusResult {
+export function queryBlastRadius(fileId: string, cache: MapraCache): BlastRadiusResult {
   // Use pre-computed risk data when available; only run BFS for cascade path
   const precomputed = cache.analysis.risk.find(r => r.nodeId === fileId);
 

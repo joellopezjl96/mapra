@@ -65,7 +65,7 @@ describe("CHURN graph-membership filter", () => {
       ["src/encoder/strand-format-encode.ts", makeChurnEntry("src/encoder/strand-format-encode.ts", 8)],
       ["yarn.lock", makeChurnEntry("yarn.lock", 15)],
       ["FINDINGS.md", makeChurnEntry("FINDINGS.md", 12)],
-      [".strand", makeChurnEntry(".strand", 7)],
+      [".mapra", makeChurnEntry(".mapra", 7)],
     ]);
 
     const analysis: GraphAnalysis = {
@@ -86,7 +86,7 @@ describe("CHURN graph-membership filter", () => {
     // Non-graph files should NOT appear
     expect(churnSection).not.toContain("yarn.lock");
     expect(churnSection).not.toContain("FINDINGS.md");
-    expect(churnSection).not.toContain(".strand");
+    expect(churnSection).not.toContain(".mapra");
   });
 
   it("renders empty when all churn entries are non-graph files", () => {

@@ -1,12 +1,12 @@
 /**
  * Templates and pure logic for CLAUDE.md section management.
  *
- * applyStrandSection() is a pure function: given existing CLAUDE.md content
+ * applyMapraSection() is a pure function: given existing CLAUDE.md content
  * (or null), it returns the new content and an action describing what changed.
  */
 
-export const STRAND_MARKER_START = "<!-- strand:start -->";
-export const STRAND_MARKER_END = "<!-- strand:end -->";
+export const MAPRA_MARKER_START = "<!-- mapra:start -->";
+export const MAPRA_MARKER_END = "<!-- mapra:end -->";
 
 /**
  * The canonical section content placed between markers.
@@ -17,29 +17,29 @@ export const CLAUDE_MD_SECTION = `
 
 ## Codebase Map
 
-Before exploring files for any task \u2014 read .strand first. The USAGE line
+Before exploring files for any task \u2014 read .mapra first. The USAGE line
 tells you which sections matter for your task type. Only open individual
 files when you need implementation details the encoding doesn't provide.
 
-If .strand has been regenerated during this session, always prefer the
+If .mapra has been regenerated during this session, always prefer the
 most recently read version. Compare the \`generated\` timestamp in the
 header line to identify which is newest.
 
-@.strand
+@.mapra
 
-For detailed structural queries, use \`strnd query <type> <file>\`.
+For detailed structural queries, use \`mapra query <type> <file>\`.
 Available types: blast_radius, risk_profile, test_map. Use --json for structured output.
 `;
 
-/** Message printed to stdout after strnd update to signal context supersession. */
+/** Message printed to stdout after mapra update to signal context supersession. */
 export function SUPERSESSION_MESSAGE(isoTimestamp: string): string {
-  return `.strand regenerated (${isoTimestamp}) \u2014 supersedes any prior .strand in context.`;
+  return `.mapra regenerated (${isoTimestamp}) \u2014 supersedes any prior .mapra in context.`;
 }
 
 /** Full marked section: start marker + content + end marker + trailing newline. */
-export const MARKED_SECTION = `${STRAND_MARKER_START}${CLAUDE_MD_SECTION}${STRAND_MARKER_END}\n`;
+export const MARKED_SECTION = `${MAPRA_MARKER_START}${CLAUDE_MD_SECTION}${MAPRA_MARKER_END}\n`;
 
-export type StrandAction =
+export type MapraAction =
   | "created"
   | "upgraded"
   | "legacy-upgraded"
@@ -48,12 +48,12 @@ export type StrandAction =
 
 /**
  * Pure function: given existing CLAUDE.md content (or null if file doesn't
- * exist), returns the new content with strnd section markers and the
+ * exist), returns the new content with mapra section markers and the
  * action that was taken.
  */
-export function applyStrandSection(
+export function applyMapraSection(
   existingContent: string | null,
-): { content: string; action: StrandAction } {
+): { content: string; action: MapraAction } {
   // Case A: No CLAUDE.md exists — create from scratch
   if (existingContent === null) {
     return {
@@ -63,12 +63,12 @@ export function applyStrandSection(
   }
 
   // Case B: Markers already present
-  const startIdx = existingContent.indexOf(STRAND_MARKER_START);
-  const endIdx = existingContent.indexOf(STRAND_MARKER_END);
+  const startIdx = existingContent.indexOf(MAPRA_MARKER_START);
+  const endIdx = existingContent.indexOf(MAPRA_MARKER_END);
 
   if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
     const between = existingContent.slice(
-      startIdx + STRAND_MARKER_START.length,
+      startIdx + MAPRA_MARKER_START.length,
       endIdx,
     );
 
@@ -80,7 +80,7 @@ export function applyStrandSection(
     // B2: Content differs — replace between markers (inclusive)
     const before = existingContent.slice(0, startIdx);
     const afterRaw = existingContent.slice(
-      endIdx + STRAND_MARKER_END.length,
+      endIdx + MAPRA_MARKER_END.length,
     );
     // Consume one trailing newline since MARKED_SECTION already includes it
     const after = afterRaw.startsWith("\n") ? afterRaw.slice(1) : afterRaw;
@@ -91,8 +91,8 @@ export function applyStrandSection(
     };
   }
 
-  // Case C: Legacy @.strand without markers
-  const legacyRegex = /\n?---\n+## Codebase Map[\s\S]*?@\.strand\n?/;
+  // Case C: Legacy @.mapra without markers
+  const legacyRegex = /\n?---\n+## Codebase Map[\s\S]*?@\.mapra\n?/;
 
   if (legacyRegex.test(existingContent)) {
     let content = existingContent.replace(
@@ -106,12 +106,12 @@ export function applyStrandSection(
     return { content, action: "legacy-upgraded" };
   }
 
-  // Case D: Neither markers nor @.strand — append
-  // Guard: if @.strand already exists but legacy regex didn't match,
+  // Case D: Neither markers nor @.mapra — append
+  // Guard: if @.mapra already exists but legacy regex didn't match,
   // wrap it with markers in place rather than duplicating
-  if (/^@\.strand$/m.test(existingContent)) {
+  if (/^@\.mapra$/m.test(existingContent)) {
     const content = existingContent.replace(
-      /^@\.strand$/m,
+      /^@\.mapra$/m,
       MARKED_SECTION.trimEnd(),
     );
     return { content, action: "legacy-upgraded" };

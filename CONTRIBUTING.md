@@ -1,17 +1,17 @@
-# Contributing to strnd
+# Contributing to mapra
 
 ## Quick Start
 
 ```bash
-git clone https://github.com/joellopezjl96/strand.git
-cd strand
+git clone https://github.com/joellopezjl96/mapra.git
+cd mapra
 npm install
 npm test
 ```
 
 ## Architecture
 
-strnd has four modules that form a pipeline:
+mapra has four modules that form a pipeline:
 
 ```
 Scanner → Analyzer → Encoder → CLI
@@ -19,8 +19,8 @@ Scanner → Analyzer → Encoder → CLI
 
 1. **Scanner** (`src/scanner/index.ts`) — walks source files, extracts imports/exports, builds a `StrandGraph` of nodes and edges
 2. **Analyzer** (`src/analyzer/`) — computes blast radius, churn, dead code, conventions, and co-change from the graph
-3. **Encoder** (`src/encoder/strand-format-encode.ts`) — renders the graph + analysis into the `.strand` text format
-4. **CLI** (`src/cli/index.ts`) — `strnd` command: generate, init, update, status, install-hooks
+3. **Encoder** (`src/encoder/strand-format-encode.ts`) — renders the graph + analysis into the `.mapra` text format
+4. **CLI** (`src/cli/index.ts`) — `mapra` command: generate, init, update, status, install-hooks
 
 ## Running Tests
 
@@ -33,7 +33,7 @@ Tests use Vitest with temporary directories for filesystem fixtures.
 
 ## Adding a New Section
 
-To add a new section to `.strand` output:
+To add a new section to `.mapra` output:
 
 1. Add computation to `src/analyzer/index.ts` (or a new file in `src/analyzer/`)
 2. Add the result field to `GraphAnalysis` interface

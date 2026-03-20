@@ -4,7 +4,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import { execSync } from "child_process";
-import { writeCache, loadCache, checkStaleness, ensureCacheInGitignore, type StrandCache } from "../cache.js";
+import { writeCache, loadCache, checkStaleness, ensureCacheInGitignore, type MapraCache } from "../cache.js";
 import { createTestGraph, createTestAnalysis, createTestCache } from "./fixture.js";
 
 describe("writeCache + loadCache roundtrip", () => {
@@ -68,22 +68,22 @@ describe("loadCache error handling", () => {
 
   it("throws when cache file does not exist", () => {
     expect(() => loadCache(tmpDir)).toThrow(
-      "No .strand-cache.json found. Run 'strnd generate' first."
+      "No .mapra-cache.json found. Run 'mapra generate' first."
     );
   });
 
   it("throws on corrupted JSON", () => {
-    fs.writeFileSync(path.join(tmpDir, ".strand-cache.json"), "not json{{{");
+    fs.writeFileSync(path.join(tmpDir, ".mapra-cache.json"), "not json{{{");
     expect(() => loadCache(tmpDir)).toThrow(
-      ".strand-cache.json is corrupted. Run 'strnd generate' to rebuild."
+      ".mapra-cache.json is corrupted. Run 'mapra generate' to rebuild."
     );
   });
 
   it("throws on version mismatch", () => {
     const bad = JSON.stringify({ version: 99, graph: {}, analysis: {} });
-    fs.writeFileSync(path.join(tmpDir, ".strand-cache.json"), bad);
+    fs.writeFileSync(path.join(tmpDir, ".mapra-cache.json"), bad);
     expect(() => loadCache(tmpDir)).toThrow(
-      "Cache format is incompatible. Run 'strnd generate' to rebuild."
+      "Cache format is incompatible. Run 'mapra generate' to rebuild."
     );
   });
 });
@@ -92,7 +92,7 @@ describe("checkStaleness", () => {
   it("returns null when gitHead is absent", () => {
     // Omit gitHead entirely to satisfy exactOptionalPropertyTypes
     const { gitHead: _, ...rest } = createTestCache();
-    const cache = rest as StrandCache;
+    const cache = rest as MapraCache;
     expect(checkStaleness(cache)).toBeNull();
   });
 
@@ -133,27 +133,27 @@ describe("ensureCacheInGitignore", () => {
   it("creates .gitignore if it does not exist", () => {
     ensureCacheInGitignore(tmpDir);
     const content = fs.readFileSync(path.join(tmpDir, ".gitignore"), "utf-8");
-    expect(content).toBe(".strand-cache.json\n");
+    expect(content).toBe(".mapra-cache.json\n");
   });
 
   it("appends entry to existing .gitignore", () => {
     fs.writeFileSync(path.join(tmpDir, ".gitignore"), "node_modules\n");
     ensureCacheInGitignore(tmpDir);
     const content = fs.readFileSync(path.join(tmpDir, ".gitignore"), "utf-8");
-    expect(content).toBe("node_modules\n.strand-cache.json\n");
+    expect(content).toBe("node_modules\n.mapra-cache.json\n");
   });
 
   it("adds newline separator when existing file lacks trailing newline", () => {
     fs.writeFileSync(path.join(tmpDir, ".gitignore"), "node_modules");
     ensureCacheInGitignore(tmpDir);
     const content = fs.readFileSync(path.join(tmpDir, ".gitignore"), "utf-8");
-    expect(content).toBe("node_modules\n.strand-cache.json\n");
+    expect(content).toBe("node_modules\n.mapra-cache.json\n");
   });
 
   it("skips if entry is already present", () => {
-    fs.writeFileSync(path.join(tmpDir, ".gitignore"), "node_modules\n.strand-cache.json\n");
+    fs.writeFileSync(path.join(tmpDir, ".gitignore"), "node_modules\n.mapra-cache.json\n");
     ensureCacheInGitignore(tmpDir);
     const content = fs.readFileSync(path.join(tmpDir, ".gitignore"), "utf-8");
-    expect(content).toBe("node_modules\n.strand-cache.json\n");
+    expect(content).toBe("node_modules\n.mapra-cache.json\n");
   });
 });

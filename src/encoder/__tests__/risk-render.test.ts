@@ -78,7 +78,7 @@ describe("header", () => {
     const analysis = makeAnalysis();
     const output = encodeToStrandFormat(graph, analysis);
 
-    expect(output).toMatch(/^STRAND v3 \|/);
+    expect(output).toMatch(/^MAPRA v3 \|/);
     expect(output).toMatch(/\| generated \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
   });
 });

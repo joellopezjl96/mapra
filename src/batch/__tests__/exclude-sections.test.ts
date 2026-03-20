@@ -3,7 +3,7 @@ import { stripSections } from "../runner.js";
 
 describe("stripSections", () => {
   const sampleStrand = [
-    "STRAND v3 | test | Typescript | 10 files",
+    "MAPRA v3 | test | Typescript | 10 files",
     "LEGEND: ...",
     "USAGE: ...",
     "",
@@ -41,7 +41,7 @@ describe("stripSections", () => {
 
   it("preserves header and legend when stripping sections", () => {
     const result = stripSections(sampleStrand, ["RISK", "CHURN", "TERRAIN"]);
-    expect(result).toContain("STRAND v3");
+    expect(result).toContain("MAPRA v3");
     expect(result).toContain("LEGEND:");
     expect(result).toContain("USAGE:");
   });

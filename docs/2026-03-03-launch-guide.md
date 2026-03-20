@@ -1,171 +1,24 @@
 # Launch Guide: Day by Day
 
 **Created:** 2026-03-03
-**Milestones:** npm publish (March 15) | blog post (March 22) | Anthropic DevRel (March 31)
+**Updated:** 2026-03-19 (rebased from npm publish date)
+**Milestones:** ~~npm publish~~ DONE (March 19) | blog post (March 26) | Anthropic DevRel (April 2)
 **Rule:** No encoding/scanner work until milestones 1 and 2 are done.
 
 ---
 
-## Week 1: Make the Package Shippable
+## ~~Week 1: Make the Package Shippable~~ DONE
 
-### Day 1 — Monday March 3 (today)
+Package renamed from `strnd` to `mapra`. Published to npm on March 19.
+README, LICENSE, shebang, dependencies — all handled.
 
-**Fix the two things that will break `npx strand`:**
-
-1. **Move tree-sitter from devDependencies to dependencies.** The scanner imports it at runtime. Anyone running `npx strand` will get `MODULE_NOT_FOUND`. Same for `tree-sitter-typescript`.
-
-2. **Add a shebang to the CLI entry point.** `dist/cli/index.js` needs `#!/usr/bin/env node` at the top or npm's bin linking won't work. Add it to the TypeScript source so `tsc` emits it.
-
-**Then verify the whole chain works end to end:**
-```
-npm run build
-npm pack            # creates strand-0.1.0.tgz
-npm install -g ./strand-0.1.0.tgz
-strand              # should run setup in cwd
-strand --help       # should print help
-```
-
-If that works, Day 1 is done.
+`npx mapra --help` works from the registry.
 
 ---
 
-### Day 2 — Tuesday March 4
+## Week 1 (from publish): Write the Blog Post
 
-**Write the README.**
-
-This is the npm landing page and the GitHub first impression. It should take 30 minutes to read and answer three questions:
-1. What is this?
-2. Why should I care?
-3. How do I use it?
-
-Structure:
-```
-# strand
-
-Pre-computed codebase intelligence for AI coding agents.
-
-## The Problem
-[2-3 sentences: AI agents waste time exploring. Every session starts from scratch.]
-
-## What Strand Does
-[1 paragraph: scans codebase, builds dependency graph, outputs .strand file.
-AI agents read it and skip the exploration phase.]
-
-## Results
-[Table from experiments — the hard numbers]
-| Without strand | With strand |
-|----------------|-------------|
-| 35 tool calls  | 2 tool calls |
-| 57K tokens     | ~3.5K tokens |
-| 3 minutes      | 1.3 minutes |
-| Wrong conclusion | Correct with blast radius |
-
-## Quick Start
-npx strand
-
-## What's in the .strand File
-[Brief section list: RISK, CHURN, HOTSPOTS, etc. — one line each]
-
-## Commands
-[strand generate, strand impact, strand validate-plan, strand status]
-
-## Works With
-Claude Code, Cursor, Aider, any tool that reads project files.
-
-## License
-MIT
-```
-
-Keep it under 150 lines. No badges, no fancy formatting. Just the facts.
-
----
-
-### Day 3 — Wednesday March 5
-
-**Update package.json for publish readiness.**
-
-- [ ] Update `description` to match new value prop: "Pre-computed codebase intelligence for AI coding agents"
-- [ ] Update `keywords` — drop "visual-encoding", add "blast-radius", "dependency-graph", "codebase-analysis", "code-intelligence"
-- [ ] Add `repository`, `bugs`, and `homepage` fields pointing to GitHub
-- [ ] Verify `files` array includes everything needed (dist/, README.md) and excludes everything else (experiments/, FINDINGS.md, docs/)
-- [ ] Bump version to `0.2.0` (first public release deserves a minor bump)
-- [ ] Run `npm pack --dry-run` and review the file list — nothing sensitive should be in there
-
-**Also: audit dependencies.**
-```
-npm audit
-npx license-checker --summary
-```
-
-Make sure there's nothing surprising. You're about to put your name on this.
-
----
-
-### Day 4 — Thursday March 6
-
-**Dry-run the full install experience.**
-
-On a clean directory (or ask a friend), run:
-```
-npx strand@0.2.0   # after publish, but simulate with local tgz first
-```
-
-What to check:
-- Does it install in under 30 seconds?
-- Does `strand` run without errors on a real JS/TS project?
-- Does `strand --help` print clean output?
-- Does `.strand` get created and look correct?
-- Does `strand init` wire CLAUDE.md properly?
-- Does the error message make sense if you run it in an empty directory?
-
-Fix whatever breaks. This is the experience every new user will have.
-
----
-
-### Day 5 — Friday March 7
-
-**Write the npm publish script and test it.**
-
-- [ ] Create an npm account if you don't have one
-- [ ] Set up 2FA on npm (required for new packages)
-- [ ] Run `npm publish --dry-run` and verify output
-- [ ] Check that the package name `strand` is available (it may not be — have a backup like `strand-ai` or `codebase-strand`)
-
-```
-npm view strand    # check if name is taken
-```
-
-If `strand` is taken, decide on the name now. Don't wait until publish day.
-
-**End of Week 1 checkpoint:** You should have a package that builds, installs from tarball, runs correctly, has a README, and is ready to publish. Everything from here is polish.
-
----
-
-## Week 2: Publish and Start the Blog Post
-
-### Day 6 — Monday March 10
-
-**Publish to npm.**
-
-```
-npm login
-npm publish --provenance
-```
-
-Immediately after:
-```
-npx strand@0.2.0 --help    # verify it works from the registry
-```
-
-Then run it against a real project you have locally (the SenorBurritoCompany codebase from your experiments). Verify the output is correct.
-
-**If anything is broken, unpublish within 24 hours and fix it.** After 24 hours, npm won't let you unpublish.
-
-Post on Twitter/X: "strand is on npm. Pre-computed codebase intelligence for AI coding agents. `npx strand` in any JS/TS project. https://npmjs.com/package/strand" — keep it short, include the one-liner.
-
----
-
-### Day 7 — Tuesday March 11
+### Day 1 — Thursday March 20
 
 **Start the blog post. Outline only today.**
 
@@ -178,7 +31,7 @@ Outline:
    - Cost in tokens, time, and accuracy
 
 2. What we tried (1 paragraph)
-   - 8 controlled experiments, two codebases
+   - 13 controlled experiments, two codebases
 
 3. The results (the meat — tables and numbers)
    - 45 tool calls → 0 (Experiment 7)
@@ -188,12 +41,12 @@ Outline:
    - Real-world: 35 calls, 57K tokens, wrong → 2 calls, 3.5K tokens, correct
 
 4. How it works (3-4 paragraphs)
-   - What .strand contains
+   - What .mapra contains
    - How agents use it (CLAUDE.md integration)
-   - Show a real .strand snippet
+   - Show a real .mapra snippet
 
 5. Try it (CTA)
-   - npx strand
+   - npx mapra
    - Link to GitHub
 ```
 
@@ -201,7 +54,7 @@ Don't write prose today. Just nail the structure and pull the exact numbers from
 
 ---
 
-### Day 8 — Wednesday March 12
+### Day 2 — Friday March 21
 
 **Write the blog post: sections 1-3.**
 
@@ -211,17 +64,17 @@ Pull direct quotes from experiment results. Real data > marketing language.
 
 ---
 
-### Day 9 — Thursday March 13
+### Day 3 — Saturday March 22
 
 **Write the blog post: sections 4-5.**
 
-Include an actual `.strand` snippet (use a trimmed version of your own .strand — 20-30 lines showing RISK and CHURN sections). Let the reader see what the agent sees.
+Include an actual `.mapra` snippet (use a trimmed version of your own .mapra — 20-30 lines showing RISK and CHURN sections). Let the reader see what the agent sees.
 
-The CTA is just `npx strand`. Don't oversell. The data already did the selling.
+The CTA is just `npx mapra`. Don't oversell. The data already did the selling.
 
 ---
 
-### Day 10 — Friday March 14
+### Day 4 — Sunday March 23
 
 **Edit the blog post.**
 
@@ -231,21 +84,21 @@ Send it to one person for feedback. Ideally someone who uses Claude Code or Curs
 
 ---
 
-## Week 3: Publish the Blog Post and Prep DevRel Outreach
+## Week 2 (from publish): Publish the Blog Post and Start Distribution
 
-### Day 11 — Monday March 17
+### Day 5 — Monday March 24
 
 **Incorporate feedback. Final edit.**
 
 Check:
 - [ ] Every number in the post matches FINDINGS.md
-- [ ] The `npx strand` command actually works right now
+- [ ] The `npx mapra` command actually works right now
 - [ ] All links work
 - [ ] No typos in code snippets
 
 ---
 
-### Day 12 — Tuesday March 18
+### Day 6 — Tuesday March 25
 
 **Decide where to publish.**
 
@@ -258,21 +111,21 @@ Publish on one platform. Cross-post later if it gets traction.
 
 ---
 
-### Day 13 — Wednesday March 19
+### Day 7 — Wednesday March 26
 
 **Publish the blog post.**
 
 Post it. Share it:
 - Twitter/X with the key stat: "45 tool calls → 0. Here's how."
 - Relevant Discord servers (Claude Code, Cursor, AI dev tools)
-- Hacker News (title: "Show HN: Strand – pre-computed codebase intelligence for AI agents")
+- Hacker News (title: "Show HN: Mapra – pre-computed codebase intelligence for AI agents")
 - Reddit r/programming, r/ChatGPTCoding
 
 Don't spam. One post per platform. Let the data do the work.
 
 ---
 
-### Day 14-15 — Thursday-Friday March 20-21
+### Days 8-9 — Thursday-Friday March 27-28
 
 **Monitor and respond.**
 
@@ -286,9 +139,9 @@ Reply to every comment in the first 48 hours. This is your only distribution cha
 
 ---
 
-## Week 4: Anthropic DevRel
+## Week 3 (from publish): Anthropic DevRel
 
-### Day 16 — Monday March 24
+### Day 10 — Monday March 31
 
 **Draft the Anthropic DevRel outreach.**
 
@@ -296,23 +149,23 @@ This is a cold email or DM. Keep it under 200 words.
 
 Structure:
 ```
-Subject: .strand — pre-computed codebase intelligence for Claude Code
+Subject: .mapra — pre-computed codebase intelligence for Claude Code
 
 Hi [name],
 
-I built strand, a tool that pre-computes dependency graphs, blast radius,
-and architectural topology for codebases. The output is a .strand file
+I built mapra, a tool that pre-computes dependency graphs, blast radius,
+and architectural topology for codebases. The output is a .mapra file
 that Claude Code reads automatically.
 
-I ran 8 controlled experiments. The results:
+I ran 13 controlled experiments across two codebases. The results:
 - 45 tool calls → 0 for structural questions
 - 78% cost reduction when pairing with cheaper models
 - 3/3 blast radius accuracy vs 0/3 without
 
-It's on npm: npx strand
+It's on npm: npx mapra
 Blog post with the full data: [link]
 
-I'd love to explore whether .strand could be a recommended practice in
+I'd love to explore whether .mapra could be a recommended practice in
 the Claude Code docs. Happy to share the full experiment data.
 
 Joel
@@ -322,7 +175,7 @@ That's it. Short, data-led, clear ask.
 
 ---
 
-### Day 17 — Tuesday March 25
+### Day 11 — Tuesday April 1
 
 **Find the right person to email.**
 
@@ -335,7 +188,7 @@ LinkedIn or Twitter DM are both fine. If you can find an email, use email.
 
 ---
 
-### Day 18 — Wednesday March 26
+### Day 12 — Wednesday April 2
 
 **Send the outreach.**
 
@@ -343,13 +196,13 @@ Send to 2-3 people max. Not a mass email. Personalize if you can reference somet
 
 ---
 
-### Days 19-23 — March 27-31
+### Days 13-15 — April 3-7
 
-**Follow up if no response by Day 21.**
+**Follow up if no response by Day 15.**
 
 One follow-up. Short: "Just checking if this landed in your inbox. Happy to do a quick call or share more data."
 
-If no response by March 31, that's fine. The milestone is "initiate contact," not "get a partnership." The blog post and npm presence are doing distribution work regardless.
+If no response by April 7, that's fine. The milestone is "initiate contact," not "get a partnership." The blog post and npm presence are doing distribution work regardless.
 
 ---
 
@@ -357,9 +210,8 @@ If no response by March 31, that's fine. The milestone is "initiate contact," no
 
 | Date | Milestone | Done? |
 |------|-----------|-------|
-| March 7 | Package installable from tarball, README written | |
-| March 10 | Published to npm | |
-| March 19 | Blog post live | |
-| March 26 | DevRel email sent | |
+| March 19 | Published to npm as `mapra` | :white_check_mark: |
+| March 26 | Blog post live | |
+| April 2 | DevRel email sent | |
 
-After March 31, encoding work (v4, Python scanner, etc.) is unblocked. Not before.
+After April 7, encoding work (v4, Python scanner, etc.) is unblocked. Not before.

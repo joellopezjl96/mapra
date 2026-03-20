@@ -35,7 +35,7 @@ describe("change-safety config", () => {
   it("stripSections produces different encodings per condition", () => {
     // Simulate what the runner does with a sample encoding
     const sample = [
-      "STRAND v3 | test | Typescript | 10 files",
+      "MAPRA v3 | test | Typescript | 10 files",
       "",
       "─── RISK (change with care) ─────────────────────────────",
       "src/lib/foo.ts  10 affected",
