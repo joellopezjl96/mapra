@@ -96,7 +96,7 @@ describe("section stripping", () => {
     expect(stripped).not.toContain("─── RISK");
 
     // Other sections should remain
-    expect(stripped).toContain("─── TEST COVERAGE");
+    expect(stripped).toContain("─── INFRASTRUCTURE");
   });
 
   it("removes MOST IMPORTED section while keeping RISK", () => {

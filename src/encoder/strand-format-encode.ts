@@ -66,9 +66,6 @@ export function encodeToStrandFormat(graph: StrandGraph, analysis?: GraphAnalysi
   out += renderApiRoutes(graph);
   out += renderPages(graph);
 
-  // TEST COVERAGE — lowest signal, fine at end
-  out += renderTestCoverage(graph);
-
   return out;
 }
 
@@ -397,24 +394,6 @@ function renderMostImported(graph: StrandGraph): string {
   }
 
   out += `\n`;
-  return out;
-}
-
-function renderTestCoverage(graph: StrandGraph): string {
-  const testNodes = graph.nodes.filter((n) => n.type === "test");
-  const testEdges = graph.edges.filter((e) => e.type === "tests");
-  const testedFiles = new Set(testEdges.map((e) => e.to));
-  const testableFiles = graph.nodes.filter(
-    (n) => n.type !== "test" && n.type !== "config",
-  );
-  const coveragePercent =
-    testableFiles.length > 0
-      ? ((testedFiles.size / testableFiles.length) * 100).toFixed(1)
-      : "0";
-
-  let out = `─── TEST COVERAGE ───────────────────────────────────────\n`;
-  out += `${testNodes.length} test files | ${testedFiles.size}/${testableFiles.length} testable files with direct test edges (${coveragePercent}%)\n`;
-
   return out;
 }
 
