@@ -47,7 +47,6 @@ function makeGraph(nodes: StrandNode[], edges: StrandEdge[] = []): StrandGraph {
 function makeAnalysis(risk: BlastResult[]): GraphAnalysis {
   return {
     risk,
-    deadCode: [],
     churn: new Map(),
     conventions: [],
     coChanges: [],

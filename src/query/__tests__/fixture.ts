@@ -98,7 +98,6 @@ export function createTestAnalysis(): GraphAnalysis {
 
   return {
     risk,
-    deadCode: [],
     churn,
     conventions,
     coChanges,

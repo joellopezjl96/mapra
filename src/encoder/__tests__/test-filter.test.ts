@@ -64,7 +64,6 @@ function makeAnalysis(): GraphAnalysis {
         affectedModuleNames: ["src/app", "src/lib"],
       },
     ],
-    deadCode: [],
     churn: new Map(),
     conventions: [],
     coChanges: [],

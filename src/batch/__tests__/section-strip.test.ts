@@ -77,7 +77,6 @@ function makeAnalysis(): GraphAnalysis {
         amplificationRatio: 1.0,
       },
     ],
-    deadCode: [],
     churn: new Map(),
     conventions: [],
     coChanges: [],

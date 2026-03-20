@@ -774,17 +774,6 @@ async function runValidatePlan(
     }
   }
 
-  // Report: DEAD CODE REFERENCED
-  const deadCodeSet = new Set(analysis.deadCode);
-  const deadRefs = planPaths.filter((p) => deadCodeSet.has(p));
-  if (deadRefs.length > 0) {
-    console.log("DEAD CODE REFERENCED (plan modifies unreachable files):");
-    for (const d of deadRefs) {
-      console.log(`  ${d}`);
-    }
-    console.log();
-  }
-
   // Report: NOT FOUND (new files the plan will create)
   if (notFound.length > 0) {
     console.log(
@@ -798,7 +787,7 @@ async function runValidatePlan(
 
   // Summary
   console.log(
-    `SUMMARY: ${stale.length} stale, ${highCascade.length} high-cascade, ${deadRefs.length} dead-code, ${notFound.length} new files`,
+    `SUMMARY: ${stale.length} stale, ${highCascade.length} high-cascade, ${notFound.length} new files`,
   );
 
   // Checkpoint validation

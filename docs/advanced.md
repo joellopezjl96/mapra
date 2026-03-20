@@ -20,7 +20,6 @@ mapra validate-plan docs/plans/my-feature.md
 | STALE | Files modified recently — your plan may be working with outdated assumptions |
 | HIGH CASCADE | Files with amplification >= 2.0 — changes here break more than you'd expect |
 | MISSING CONVENTIONS | Plan adds files of a type that usually imports a shared anchor (e.g., API routes that should use a shared auth helper) |
-| DEAD CODE REFERENCED | Plan modifies files that are unreachable from the dependency graph |
 | NEW FILES | Paths in the plan that don't exist yet (files the plan will create) |
 
 ### Example
@@ -38,7 +37,7 @@ HIGH CASCADE (amplification >= 2.0):
     exports: ORDER_ONLINE_URL
     Tests: 5 files
 
-SUMMARY: 1 stale, 1 high-cascade, 0 dead-code, 2 new files
+SUMMARY: 1 stale, 1 high-cascade, 2 new files
 ```
 
 ## The .mapra Format
@@ -124,10 +123,6 @@ pattern: 18/22 API routes import { auth } from src/lib/auth.ts
 ```
 
 Detected patterns — if most files of a type import a shared helper, this section surfaces it so new code follows the same pattern.
-
-### DEAD CODE
-
-Files unreachable from the import graph. Candidates for deletion.
 
 ## CI / Automation
 

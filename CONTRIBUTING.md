@@ -18,7 +18,7 @@ Scanner → Analyzer → Encoder → CLI
 ```
 
 1. **Scanner** (`src/scanner/index.ts`) — walks source files, extracts imports/exports, builds a `StrandGraph` of nodes and edges
-2. **Analyzer** (`src/analyzer/`) — computes blast radius, churn, dead code, conventions, and co-change from the graph
+2. **Analyzer** (`src/analyzer/`) — computes blast radius, churn, conventions, and co-change from the graph
 3. **Encoder** (`src/encoder/strand-format-encode.ts`) — renders the graph + analysis into the `.mapra` text format
 4. **CLI** (`src/cli/index.ts`) — `mapra` command: generate, init, update, status, install-hooks
 

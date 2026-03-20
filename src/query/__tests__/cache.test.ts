@@ -30,7 +30,6 @@ describe("writeCache + loadCache roundtrip", () => {
     expect(cache.graph.nodes).toHaveLength(graph.nodes.length);
     expect(cache.graph.edges).toHaveLength(graph.edges.length);
     expect(cache.analysis.risk).toHaveLength(analysis.risk.length);
-    expect(cache.analysis.deadCode).toEqual(analysis.deadCode);
     expect(cache.analysis.coChanges).toHaveLength(analysis.coChanges.length);
   });
 

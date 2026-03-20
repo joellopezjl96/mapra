@@ -70,7 +70,6 @@ describe("CHURN graph-membership filter", () => {
 
     const analysis: GraphAnalysis = {
       risk: [],
-      deadCode: [],
       churn,
       conventions: [],
       coChanges: [],
@@ -99,7 +98,6 @@ describe("CHURN graph-membership filter", () => {
 
     const analysis: GraphAnalysis = {
       risk: [],
-      deadCode: [],
       churn,
       conventions: [],
       coChanges: [],
@@ -145,7 +143,6 @@ describe("CO-CHANGE graph-membership filter", () => {
 
     const analysis: GraphAnalysis = {
       risk: [],
-      deadCode: [],
       churn: new Map(),
       conventions: [],
       coChanges: [
@@ -176,7 +173,6 @@ describe("CO-CHANGE graph-membership filter", () => {
 
     const analysis: GraphAnalysis = {
       risk: [],
-      deadCode: [],
       churn: new Map(),
       conventions: [],
       coChanges: [
