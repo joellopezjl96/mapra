@@ -14,9 +14,14 @@ scripts/
 *.tgz
 nul
 
-# Internal docs — design plans, experiment data, findings
+# Internal docs — design plans, experiment data, findings, strategy
 docs/plans/
-experiments/configs/
-experiments/experiments/
+docs/findings/
+docs/2026-03-02-strand-business-strategy.md
+docs/2026-03-02-strand-risk-assessment.md
+docs/2026-03-03-launch-guide.md
+docs/2026-03-03-monetization-decisions.md
+docs/backlog.md
+experiments/
 FINDINGS.md
 .mapra-cache.json
